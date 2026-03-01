@@ -52,7 +52,7 @@ interface DirectionPreset {
 interface Direction {
   mode: "global" | "segment"
   intent: string
-  preset: DirectionPreset
+  preset?: DirectionPreset
 }
 
 interface Segment {
