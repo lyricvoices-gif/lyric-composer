@@ -55,7 +55,7 @@ function Composer() {
   const [usedToday, setUsedToday] = useState(0)
 
   // ---------------------------------------------------------------------------
-  // Plan — derived from Clerk publicMetadata
+  // Plan — derived from Clerk Billing
   // ---------------------------------------------------------------------------
 
   // Wait for Clerk to hydrate before computing limits
