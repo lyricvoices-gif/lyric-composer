@@ -2,8 +2,8 @@
  * lib/planConfig.ts
  * Plan tier definitions and limit enforcement for Lyric Composer.
  *
- * Plans are read from Clerk publicMetadata.plan.
- * Unknown or missing plan strings default to "creator" (lowest paid tier).
+ * Plans are resolved via Clerk Billing using the has() checker from auth().
+ * Falls back to "creator" (lowest paid tier) if no plan is assigned.
  * There is no free tier in the Next.js app — the Framer mini composer handles that.
  */
 
@@ -87,4 +87,22 @@ export function remainingGenerations(
 ): number | null {
   if (plan.dailyGenerationLimit === -1) return null
   return Math.max(0, plan.dailyGenerationLimit - currentDailyUsage)
+}
+
+/**
+ * Resolves the active PlanId from Clerk Billing using the has() checker.
+ * Checks tiers in descending order (enterprise → studio → creator) so the
+ * highest-entitled plan always wins.
+ * Falls back to "creator" if the user has no plan assigned yet.
+ *
+ * Server usage:  const { has } = await auth()
+ * Client usage:  const { has } = useAuth()
+ */
+export function resolvePlanId(
+  has: (params: { plan: string }) => boolean
+): PlanId {
+  if (has({ plan: "enterprise" })) return "enterprise"
+  if (has({ plan: "studio" })) return "studio"
+  if (has({ plan: "creator" })) return "creator"
+  return "creator"
 }

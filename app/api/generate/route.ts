@@ -20,10 +20,10 @@
  *   );
  */
 
-import { currentUser } from "@clerk/nextjs/server"
+import { auth } from "@clerk/nextjs/server"
 import { neon } from "@neondatabase/serverless"
 import { getVoice, VoiceId } from "@/lib/voiceData"
-import { getPlanConfig, isUnderDailyLimit, remainingGenerations } from "@/lib/planConfig"
+import { getPlanConfig, isUnderDailyLimit, remainingGenerations, resolvePlanId } from "@/lib/planConfig"
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -105,13 +105,10 @@ async function incrementDailyUsage(userId: string): Promise<void> {
 
 export async function POST(req: Request): Promise<Response> {
   // ── 1. Auth ───────────────────────────────────────────────────────────────
-  const user = await currentUser()
-  if (!user) {
+  const { userId, has } = await auth()
+  if (!userId) {
     return Response.json({ error: "Unauthorized" }, { status: 401 })
   }
-
-  const userId = user.id
-  const planId = user.publicMetadata?.plan as string | undefined
 
   // ── 2. Parse body ─────────────────────────────────────────────────────────
   let body: GenerateRequest
@@ -131,7 +128,7 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   // ── 3. Plan + usage check ─────────────────────────────────────────────────
-  const plan = getPlanConfig(planId)
+  const plan = getPlanConfig(resolvePlanId(has))
 
   if (script.length > plan.maxScriptCharacters) {
     return Response.json(

@@ -1,9 +1,9 @@
 "use client"
 
-import { SignedIn, SignedOut, RedirectToSignIn, UserButton, useUser } from "@clerk/nextjs"
+import { SignedIn, SignedOut, RedirectToSignIn, UserButton, useAuth } from "@clerk/nextjs"
 import { useState, useRef, useEffect } from "react"
 import { getAllVoices, VoiceDefinition } from "@/lib/voiceData"
-import { getPlanConfig, remainingGenerations } from "@/lib/planConfig"
+import { getPlanConfig, remainingGenerations, resolvePlanId } from "@/lib/planConfig"
 
 // ---------------------------------------------------------------------------
 // Page — Clerk gate
@@ -27,7 +27,7 @@ export default function ComposerPage() {
 // ---------------------------------------------------------------------------
 
 function Composer() {
-  const { user, isLoaded } = useUser()
+  const { has, isLoaded } = useAuth()
   const voices = getAllVoices()
 
   // Voice & variant
@@ -59,9 +59,7 @@ function Composer() {
   // ---------------------------------------------------------------------------
 
   // Wait for Clerk to hydrate before computing limits
-  const plan = getPlanConfig(
-    isLoaded ? (user?.publicMetadata?.plan as string | undefined) : undefined
-  )
+  const plan = getPlanConfig(isLoaded ? resolvePlanId(has) : undefined)
   const remaining = remainingGenerations(plan, usedToday)
   const isAtLimit = remaining !== null && remaining <= 0
 
