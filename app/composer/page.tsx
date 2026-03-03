@@ -1,9 +1,11 @@
 "use client"
 
-import { SignedIn, SignedOut, RedirectToSignIn, UserButton, useAuth } from "@clerk/nextjs"
+import { SignedIn, SignedOut, UserButton, useAuth } from "@clerk/nextjs"
 import { useState, useRef, useEffect } from "react"
 import { getAllVoices, VoiceDefinition } from "@/lib/voiceData"
-import { getPlanConfig, remainingGenerations, resolvePlanId } from "@/lib/planConfig"
+import { getPlanConfig, remainingGenerations, resolvePlanId, hasPaidPlan } from "@/lib/planConfig"
+
+const FRAMER_URL = "https://formal-organization-793965.framer.app"
 
 // ---------------------------------------------------------------------------
 // Page — Clerk gate
@@ -16,9 +18,48 @@ export default function ComposerPage() {
         <Composer />
       </SignedIn>
       <SignedOut>
-        <RedirectToSignIn />
+        <FramerRedirect />
       </SignedOut>
     </>
+  )
+}
+
+// Redirects unauthenticated visitors to the Framer mini composer
+function FramerRedirect() {
+  useEffect(() => {
+    window.location.replace(FRAMER_URL)
+  }, [])
+  return null
+}
+
+// Shown to authenticated users with no paid plan assigned
+function NoPlanWall() {
+  return (
+    <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col items-center justify-center p-8">
+      <p className="text-xs font-medium tracking-[0.2em] text-zinc-600 uppercase mb-10">
+        Lyric
+      </p>
+      <div className="max-w-xs text-center flex flex-col gap-4">
+        <h1 className="text-lg font-semibold tracking-tight">
+          Composer requires a plan
+        </h1>
+        <p className="text-sm text-zinc-500 leading-relaxed">
+          Lyric Composer is available on Creator, Studio, and Enterprise plans.
+        </p>
+        <a
+          href={FRAMER_URL}
+          className="mt-2 inline-flex items-center justify-center px-6 py-2.5 rounded-xl bg-white text-black text-sm font-medium hover:bg-zinc-100 transition-colors"
+        >
+          View plans
+        </a>
+        <p className="text-xs text-zinc-700 mt-2">
+          Already subscribed? Sign out and sign back in to refresh your session.
+        </p>
+        <div className="flex justify-center mt-1">
+          <UserButton afterSignOutUrl={FRAMER_URL} />
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -203,6 +244,11 @@ function Composer() {
     const m = Math.floor(s / 60)
     const sec = Math.floor(s % 60)
     return `${m}:${sec.toString().padStart(2, "0")}`
+  }
+
+  // No-plan gate — must come after all hooks
+  if (isLoaded && !hasPaidPlan(has)) {
+    return <NoPlanWall />
   }
 
   // ---------------------------------------------------------------------------

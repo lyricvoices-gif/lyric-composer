@@ -106,3 +106,13 @@ export function resolvePlanId(
   if (has({ plan: "creator" })) return "creator"
   return "creator"
 }
+
+/**
+ * Returns true if the user holds any paid plan.
+ * Used to gate access to the composer for authenticated-but-unpaid users.
+ */
+export function hasPaidPlan(
+  has: (params: { plan: string }) => boolean
+): boolean {
+  return has({ plan: "enterprise" }) || has({ plan: "studio" }) || has({ plan: "creator" })
+}
