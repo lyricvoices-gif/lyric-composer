@@ -1,11 +1,35 @@
 "use client"
 
 import { SignedIn, SignedOut, UserButton, useAuth } from "@clerk/nextjs"
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { getAllVoices, VoiceDefinition } from "@/lib/voiceData"
 import { getPlanConfig, remainingGenerations, resolvePlanId, hasPaidPlan } from "@/lib/planConfig"
 
 const FRAMER_URL = "https://formal-organization-793965.framer.app"
+
+const DIRECTIONS = [
+  "Conversational", "Intimate", "Authoritative", "Playful",
+  "Contemplative", "Warm", "Urgent", "Reassuring",
+  "Emphasis", "Pause", "Soft", "Confident", "Clear", "Smile",
+]
+
+interface Paragraph {
+  id: string
+  text: string
+  direction: string
+}
+
+interface Composition {
+  id: string
+  created_at: string
+  voice_id: string
+  variant: string
+  script: string
+  directions: Paragraph[] | null
+  audio_url: string | null
+  duration_s: number | null
+  title: string | null
+}
 
 // ---------------------------------------------------------------------------
 // Page — Clerk gate
@@ -24,7 +48,6 @@ export default function ComposerPage() {
   )
 }
 
-// Redirects unauthenticated visitors to the Framer mini composer
 function FramerRedirect() {
   useEffect(() => {
     window.location.replace(FRAMER_URL)
@@ -32,30 +55,29 @@ function FramerRedirect() {
   return null
 }
 
-// Shown to authenticated users with no paid plan assigned
 function NoPlanWall() {
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col items-center justify-center p-8">
-      <p className="text-xs font-medium tracking-[0.2em] text-zinc-600 uppercase mb-10">
+    <div style={{ minHeight: "100vh", background: "#f8f6f3", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px" }}>
+      <p style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.2em", color: "#b5aca3", textTransform: "uppercase", marginBottom: "40px" }}>
         Lyric
       </p>
-      <div className="max-w-xs text-center flex flex-col gap-4">
-        <h1 className="text-lg font-semibold tracking-tight">
+      <div style={{ maxWidth: "320px", textAlign: "center", display: "flex", flexDirection: "column", gap: "16px" }}>
+        <h1 style={{ fontSize: "18px", fontWeight: 600, letterSpacing: "-0.02em", color: "#2a2622" }}>
           Composer requires a plan
         </h1>
-        <p className="text-sm text-zinc-500 leading-relaxed">
+        <p style={{ fontSize: "14px", color: "#756d65", lineHeight: 1.6 }}>
           Lyric Composer is available on Creator, Studio, and Enterprise plans.
         </p>
         <a
           href={FRAMER_URL}
-          className="mt-2 inline-flex items-center justify-center px-6 py-2.5 rounded-xl bg-white text-black text-sm font-medium hover:bg-zinc-100 transition-colors"
+          style={{ marginTop: "8px", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "10px 24px", borderRadius: "12px", background: "#2a2622", color: "#f8f6f3", fontSize: "14px", fontWeight: 500, textDecoration: "none" }}
         >
           View plans
         </a>
-        <p className="text-xs text-zinc-700 mt-2">
+        <p style={{ fontSize: "12px", color: "#b5aca3", marginTop: "8px" }}>
           Already subscribed? Sign out and sign back in to refresh your session.
         </p>
-        <div className="flex justify-center mt-1">
+        <div style={{ display: "flex", justifyContent: "center", marginTop: "4px" }}>
           <UserButton afterSignOutUrl={FRAMER_URL} />
         </div>
       </div>
@@ -75,8 +97,15 @@ function Composer() {
   const [activeVoice, setActiveVoice] = useState<VoiceDefinition>(voices[0])
   const [activeVariant, setActiveVariant] = useState<string>(voices[0].defaultIntent)
 
-  // Script
-  const [script, setScript] = useState("")
+  // Paragraphs
+  const [paragraphs, setParagraphs] = useState<Paragraph[]>([
+    { id: crypto.randomUUID(), text: "", direction: "Conversational" },
+  ])
+  const [openPopoverId, setOpenPopoverId] = useState<string | null>(null)
+
+  // Sample audio preview
+  const sampleAudioRef = useRef<HTMLAudioElement | null>(null)
+  const [playingSampleId, setPlayingSampleId] = useState<string | null>(null)
 
   // Generation
   const [isGenerating, setIsGenerating] = useState(false)
@@ -90,19 +119,31 @@ function Composer() {
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
 
-  // Usage — optimistic client-side tracking; increments per successful generation.
-  // Does not persist across page reloads. A GET /api/usage endpoint can seed this
-  // on mount once the usage endpoint is built.
+  // Usage — optimistic client-side tracking
   const [usedToday, setUsedToday] = useState(0)
 
+  // History sidebar
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [compositions, setCompositions] = useState<Composition[]>([])
+  const [loadingCompositions, setLoadingCompositions] = useState(false)
+  const sidebarRef = useRef<HTMLDivElement>(null)
+
   // ---------------------------------------------------------------------------
-  // Plan — derived from Clerk Billing
+  // Plan — derived from Clerk Billing (unchanged)
   // ---------------------------------------------------------------------------
 
-  // Wait for Clerk to hydrate before computing limits
   const plan = getPlanConfig(isLoaded ? resolvePlanId(has) : undefined)
   const remaining = remainingGenerations(plan, usedToday)
   const isAtLimit = remaining !== null && remaining <= 0
+
+  // ---------------------------------------------------------------------------
+  // Derived script
+  // ---------------------------------------------------------------------------
+
+  const assembledScript = paragraphs.map((p) => p.text).join("\n\n").trim()
+  const isOverScriptLimit = assembledScript.length > plan.maxScriptCharacters
+  const canGenerate =
+    !isGenerating && !isAtLimit && !isOverScriptLimit && assembledScript.length > 0
 
   // ---------------------------------------------------------------------------
   // Voice handlers
@@ -119,12 +160,75 @@ function Composer() {
     setGenerationError(null)
   }
 
+  function toggleSamplePlay(voice: VoiceDefinition) {
+    if (playingSampleId === voice.id) {
+      sampleAudioRef.current?.pause()
+      setPlayingSampleId(null)
+      return
+    }
+    if (sampleAudioRef.current) {
+      sampleAudioRef.current.pause()
+    }
+    const audio = new Audio(voice.sampleUrl)
+    sampleAudioRef.current = audio
+    audio.onended = () => setPlayingSampleId(null)
+    audio.play().catch(() => {})
+    setPlayingSampleId(voice.id)
+  }
+
   // ---------------------------------------------------------------------------
-  // Generation
+  // Paragraph handlers
+  // ---------------------------------------------------------------------------
+
+  function addParagraph() {
+    setParagraphs((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), text: "", direction: "Conversational" },
+    ])
+  }
+
+  function updateParagraphText(id: string, text: string) {
+    setParagraphs((prev) => prev.map((p) => (p.id === id ? { ...p, text } : p)))
+  }
+
+  function updateParagraphDirection(id: string, direction: string) {
+    setParagraphs((prev) => prev.map((p) => (p.id === id ? { ...p, direction } : p)))
+    setOpenPopoverId(null)
+  }
+
+  function removeParagraph(id: string) {
+    setParagraphs((prev) => {
+      if (prev.length === 1) return prev
+      return prev.filter((p) => p.id !== id)
+    })
+  }
+
+  // ---------------------------------------------------------------------------
+  // Auto-save
+  // ---------------------------------------------------------------------------
+
+  async function saveComposition() {
+    await fetch("/api/compositions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        voiceId: activeVoice.id,
+        variant: activeVariant,
+        script: assembledScript,
+        directions: paragraphs,
+        audioUrl: null,
+        durationS: duration > 0 ? Math.round(duration) : null,
+        title: paragraphs[0]?.text.slice(0, 60) || null,
+      }),
+    })
+  }
+
+  // ---------------------------------------------------------------------------
+  // Generation (core logic unchanged — additive only)
   // ---------------------------------------------------------------------------
 
   async function generate() {
-    if (!script.trim() || isGenerating || isAtLimit || script.length > plan.maxScriptCharacters) return
+    if (!assembledScript || isGenerating || isAtLimit || assembledScript.length > plan.maxScriptCharacters) return
 
     setIsGenerating(true)
     setGenerationError(null)
@@ -136,12 +240,12 @@ function Composer() {
         body: JSON.stringify({
           voiceId: activeVoice.id,
           variant: activeVariant,
-          script: script.trim(),
+          script: assembledScript,
           direction: {
             mode: "global",
             intent: activeVariant,
           },
-          segments: [],
+          segments: paragraphs.map((p) => ({ text: p.text, emotion: p.direction })),
         }),
       })
 
@@ -152,7 +256,6 @@ function Composer() {
 
       const blob = await res.blob()
 
-      // Revoke previous object URL to avoid memory leak
       if (audioUrl) URL.revokeObjectURL(audioUrl)
 
       const url = URL.createObjectURL(blob)
@@ -160,6 +263,9 @@ function Composer() {
       setAudioUrl(url)
       setCurrentTime(0)
       setUsedToday((n) => n + 1)
+
+      // Auto-save (fire and forget)
+      saveComposition().catch((err) => console.error("[auto-save]", err))
     } catch (err) {
       setGenerationError(err instanceof Error ? err.message : "Generation failed")
     } finally {
@@ -168,7 +274,7 @@ function Composer() {
   }
 
   // ---------------------------------------------------------------------------
-  // Player controls
+  // Player controls (unchanged)
   // ---------------------------------------------------------------------------
 
   function togglePlay() {
@@ -190,13 +296,103 @@ function Composer() {
     const a = document.createElement("a")
     const url = URL.createObjectURL(audioBlob)
     a.href = url
-    a.download = `${activeVoice.id}-${activeVariant.toLowerCase()}.mp3`
+    a.download = `${activeVoice.id}-${activeVariant.toLowerCase()}.wav`
     a.click()
     URL.revokeObjectURL(url)
   }
 
   // ---------------------------------------------------------------------------
-  // Audio element event wiring
+  // History sidebar
+  // ---------------------------------------------------------------------------
+
+  const loadCompositions = useCallback(async () => {
+    setLoadingCompositions(true)
+    try {
+      const res = await fetch("/api/compositions")
+      if (res.ok) {
+        const data = await res.json()
+        setCompositions(data)
+      }
+    } finally {
+      setLoadingCompositions(false)
+    }
+  }, [])
+
+  function openSidebar() {
+    setSidebarOpen(true)
+    loadCompositions()
+  }
+
+  async function deleteComposition(id: string) {
+    if (!confirm("Delete this composition?")) return
+    await fetch(`/api/compositions/${id}`, { method: "DELETE" })
+    setCompositions((prev) => prev.filter((c) => c.id !== id))
+  }
+
+  function restoreComposition(comp: Composition) {
+    const voice = voices.find((v) => v.id === comp.voice_id)
+    if (voice) {
+      setActiveVoice(voice)
+      setActiveVariant(comp.variant)
+    }
+    if (comp.directions && comp.directions.length > 0) {
+      setParagraphs(comp.directions)
+    } else {
+      setParagraphs([{ id: crypto.randomUUID(), text: comp.script, direction: "Conversational" }])
+    }
+    setAudioUrl(null)
+    setAudioBlob(null)
+    setIsPlaying(false)
+    setCurrentTime(0)
+    setDuration(0)
+    setGenerationError(null)
+    setSidebarOpen(false)
+  }
+
+  function handleNewComposition() {
+    if (
+      assembledScript.trim() &&
+      !confirm("Start a new composition? Your current script will be cleared.")
+    ) return
+    setParagraphs([{ id: crypto.randomUUID(), text: "", direction: "Conversational" }])
+    setAudioUrl(null)
+    setAudioBlob(null)
+    setIsPlaying(false)
+    setCurrentTime(0)
+    setDuration(0)
+    setGenerationError(null)
+  }
+
+  // ---------------------------------------------------------------------------
+  // Click-outside: popover
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!openPopoverId) return
+    function onMouseDown(e: MouseEvent) {
+      const popover = document.getElementById(`popover-${openPopoverId}`)
+      if (popover && !popover.contains(e.target as Node)) {
+        setOpenPopoverId(null)
+      }
+    }
+    document.addEventListener("mousedown", onMouseDown)
+    return () => document.removeEventListener("mousedown", onMouseDown)
+  }, [openPopoverId])
+
+  // Click-outside: sidebar
+  useEffect(() => {
+    if (!sidebarOpen) return
+    function onMouseDown(e: MouseEvent) {
+      if (sidebarRef.current && !sidebarRef.current.contains(e.target as Node)) {
+        setSidebarOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", onMouseDown)
+    return () => document.removeEventListener("mousedown", onMouseDown)
+  }, [sidebarOpen])
+
+  // ---------------------------------------------------------------------------
+  // Audio event wiring (unchanged)
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
@@ -224,7 +420,6 @@ function Composer() {
     }
   }, [audioUrl])
 
-  // Auto-play on new audio
   useEffect(() => {
     if (audioUrl && audioRef.current) {
       audioRef.current.load()
@@ -233,12 +428,8 @@ function Composer() {
   }, [audioUrl])
 
   // ---------------------------------------------------------------------------
-  // Derived
+  // Helpers
   // ---------------------------------------------------------------------------
-
-  const isOverScriptLimit = script.length > plan.maxScriptCharacters
-  const canGenerate =
-    !isGenerating && !isAtLimit && !isOverScriptLimit && script.trim().length > 0
 
   function fmt(s: number): string {
     const m = Math.floor(s / 60)
@@ -256,178 +447,247 @@ function Composer() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col">
+    <div style={{ minHeight: "100vh", background: "#f8f6f3", display: "flex", flexDirection: "column", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
 
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="h-14 px-6 flex items-center justify-between border-b border-zinc-900 shrink-0">
-        <span className="text-xs font-medium tracking-[0.2em] text-zinc-400 uppercase">
+      {/* Hidden main audio element */}
+      <audio ref={audioRef} src={audioUrl ?? undefined} preload="metadata" style={{ display: "none" }} />
+
+      {/* ── Topbar ──────────────────────────────────────────────────────────── */}
+      <header style={{
+        position: "sticky", top: 0, zIndex: 50,
+        height: "52px", padding: "0 24px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        background: "rgba(248,246,243,0.96)", backdropFilter: "blur(16px)",
+        borderBottom: "1px solid #eae4de",
+      }}>
+        <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.2em", color: "#2a2622", textTransform: "uppercase" }}>
           Lyric
         </span>
-        <div className="flex items-center gap-5">
-          {!isLoaded ? null : remaining === null ? (
-            <span className="text-xs text-zinc-600">Unlimited · Enterprise</span>
-          ) : (
-            <span className={`text-xs tabular-nums ${remaining <= 3 ? "text-amber-400" : "text-zinc-600"}`}>
-              {remaining} generation{remaining !== 1 ? "s" : ""} left today
-            </span>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          {isLoaded && (
+            <>
+              {remaining === null ? (
+                <span style={{ fontSize: "11px", color: "#b5aca3" }}>Unlimited</span>
+              ) : (
+                <span style={{ fontSize: "11px", fontVariantNumeric: "tabular-nums", color: remaining <= 3 ? "#c4722a" : "#b5aca3" }}>
+                  {remaining} left today
+                </span>
+              )}
+              <span style={{
+                fontSize: "10px", fontWeight: 600, letterSpacing: "0.08em",
+                padding: "2px 8px", borderRadius: "100px",
+                background: "#eae4de", color: "#756d65", textTransform: "uppercase",
+              }}>
+                {plan.label}
+              </span>
+            </>
           )}
           <UserButton afterSignOutUrl="/" />
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
+      {/* ── Layout ──────────────────────────────────────────────────────────── */}
+      <div style={{ display: "flex", flex: 1 }}>
 
-        {/* ── Sidebar — Voice selector ────────────────────────────────────── */}
-        <aside className="w-48 shrink-0 border-r border-zinc-900 overflow-y-auto p-3 flex flex-col gap-2">
-          <p className="text-[10px] uppercase tracking-widest text-zinc-700 px-1 mb-1">Voice</p>
-          {voices.map((voice) => (
-            <button
-              key={voice.id}
-              onClick={() => selectVoice(voice)}
-              className={`relative rounded-lg p-3 text-left transition-all duration-150 ${
-                activeVoice.id === voice.id
-                  ? "ring-1 ring-white/30 shadow-md"
-                  : "opacity-50 hover:opacity-70"
-              }`}
-              style={{
-                background: `linear-gradient(135deg, ${voice.gradientFrom}, ${voice.gradientTo})`,
-              }}
-            >
-              <p className="text-[11px] font-semibold text-black/75 leading-tight truncate">
-                {voice.title}
+        {/* ── Left edge rail ──────────────────────────────────────────────── */}
+        <div style={{
+          width: "52px", flexShrink: 0,
+          display: "flex", flexDirection: "column", alignItems: "center",
+          paddingTop: "20px", gap: "20px",
+          borderRight: "1px solid #eae4de",
+        }}>
+          <button
+            onClick={openSidebar}
+            title="History"
+            style={{
+              width: "32px", height: "32px", borderRadius: "8px", border: "none",
+              background: sidebarOpen ? "#eae4de" : "transparent",
+              color: "#9c958f", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "16px", transition: "background 0.15s",
+            }}
+          >
+            ◷
+          </button>
+          <button
+            title="Projects — coming soon for Studio & Enterprise"
+            disabled
+            style={{
+              width: "32px", height: "32px", borderRadius: "8px", border: "none",
+              background: "transparent", color: "#d4cfc9", cursor: "not-allowed",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px",
+            }}
+          >
+            ⬚
+          </button>
+        </div>
+
+        {/* ── Main canvas ─────────────────────────────────────────────────── */}
+        <main style={{ flex: 1, overflowY: "auto", padding: "32px 24px 180px" }}>
+          <div style={{ maxWidth: "940px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "32px" }}>
+
+            {/* ── Voice selector ──────────────────────────────────────────── */}
+            <section>
+              <p style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.15em", color: "#b5aca3", textTransform: "uppercase", margin: "0 0 12px" }}>
+                Voice
               </p>
-              <p className="text-[10px] text-black/45 mt-0.5">{voice.archetype}</p>
-            </button>
-          ))}
-        </aside>
-
-        {/* ── Main ───────────────────────────────────────────────────────── */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-2xl mx-auto px-8 py-8 flex flex-col gap-7">
-
-            {/* Voice header */}
-            <div className="flex flex-col gap-3">
-              <div>
-                <h1 className="text-lg font-semibold tracking-tight">{activeVoice.title}</h1>
-                <p className="text-sm text-zinc-500 mt-1 leading-relaxed">{activeVoice.blurb}</p>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {activeVoice.verticals.map((v) => (
-                  <span
-                    key={v}
-                    className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-900 text-zinc-600 border border-zinc-800"
-                  >
-                    {v}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* ── Base Posture (variant selector) ─────────────────────────── */}
-            <div>
-              <p className="text-[10px] uppercase tracking-widest text-zinc-700 mb-2">
-                Base Posture
-              </p>
-              <div className="flex gap-2 flex-wrap">
-                {activeVoice.intents.map((intent) => (
-                  <button
-                    key={intent}
-                    onClick={() => setActiveVariant(intent)}
-                    className={`px-4 py-1.5 rounded-full text-xs border transition-all ${
-                      activeVariant === intent
-                        ? "bg-white text-black border-white"
-                        : "bg-transparent text-zinc-500 border-zinc-800 hover:border-zinc-600 hover:text-zinc-300"
-                    }`}
-                  >
-                    {intent}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* ── Direction palette ────────────────────────────────────────── */}
-            <div className="border border-zinc-900 rounded-xl p-4 flex flex-col gap-4">
-              <p className="text-[10px] uppercase tracking-widest text-zinc-700">
-                Direction Palette
-              </p>
-              {activeVoice.palette.emotionGroups.map((group) => (
-                <div key={group.label}>
-                  <p className="text-[10px] text-zinc-700 mb-2">{group.label}</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {group.items.map((item) => {
-                      const isActiveVariant =
-                        item.type === "variant" && item.value === activeVariant
-                      const isEmotion = item.type === "emotion"
-                      return (
+              <div style={{ display: "flex", gap: "12px", overflowX: "auto", paddingBottom: "8px", scrollbarWidth: "none" }}>
+                {voices.map((voice) => {
+                  const isActive = activeVoice.id === voice.id
+                  return (
+                    <div
+                      key={voice.id}
+                      onClick={() => selectVoice(voice)}
+                      style={{
+                        flexShrink: 0, width: "180px", borderRadius: "14px",
+                        background: "#ffffff",
+                        border: `1.5px solid ${isActive ? "#c4977f" : "#eae4de"}`,
+                        overflow: "hidden", cursor: "pointer",
+                        transition: "border-color 0.15s, box-shadow 0.15s",
+                        boxShadow: isActive ? "0 2px 12px rgba(196,151,127,0.15)" : "none",
+                      }}
+                    >
+                      {/* Gradient swatch with sample play */}
+                      <div style={{
+                        height: "72px", position: "relative",
+                        background: `linear-gradient(135deg, ${voice.gradientFrom}, ${voice.gradientTo})`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
                         <button
-                          key={item.value}
-                          onClick={() => {
-                            if (item.type === "variant") setActiveVariant(item.value)
+                          onClick={(e) => { e.stopPropagation(); toggleSamplePlay(voice) }}
+                          title="Preview sample"
+                          style={{
+                            width: "32px", height: "32px", borderRadius: "50%",
+                            background: "rgba(255,255,255,0.85)", border: "none",
+                            cursor: "pointer",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: "13px", color: "#2a2622",
+                            boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
                           }}
-                          disabled={isEmotion}
-                          title={
-                            isEmotion
-                              ? "Inline emotion tag — Layer 2 direction (coming soon)"
-                              : undefined
-                          }
-                          className={`px-3 py-1 rounded-full text-xs border transition-all ${
-                            isActiveVariant
-                              ? "bg-white text-black border-white"
-                              : isEmotion
-                              ? "bg-transparent text-zinc-700 border-zinc-900 cursor-default"
-                              : "bg-transparent text-zinc-500 border-zinc-800 hover:border-zinc-600 hover:text-zinc-300 cursor-pointer"
-                          }`}
                         >
-                          {item.label}
+                          {playingSampleId === voice.id ? "⏸" : "▶"}
                         </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
+                      </div>
 
-            {/* ── Script editor ───────────────────────────────────────────── */}
-            <div>
-              <div className="flex justify-between items-baseline mb-2">
-                <p className="text-[10px] uppercase tracking-widest text-zinc-700">Script</p>
-                <span
-                  className={`text-xs tabular-nums ${
-                    isOverScriptLimit ? "text-red-400" : "text-zinc-700"
-                  }`}
-                >
-                  {script.length} / {plan.maxScriptCharacters}
-                </span>
+                      {/* Info */}
+                      <div style={{ padding: "12px" }}>
+                        <p style={{ fontSize: "12px", fontWeight: 600, color: "#2a2622", margin: "0 0 2px" }}>
+                          {voice.title}
+                        </p>
+                        <p style={{ fontSize: "11px", color: "#9c958f", margin: 0 }}>
+                          {voice.archetype}
+                        </p>
+
+                        {/* Variant pills — only on active card */}
+                        {isActive && (
+                          <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "10px" }}>
+                            {voice.intents.map((intent) => (
+                              <button
+                                key={intent}
+                                onClick={(e) => { e.stopPropagation(); setActiveVariant(intent) }}
+                                style={{
+                                  padding: "2px 8px", borderRadius: "100px",
+                                  border: `1.5px solid ${activeVariant === intent ? "#2a2622" : "#d4cfc9"}`,
+                                  fontSize: "10px", fontWeight: 500, cursor: "pointer",
+                                  background: activeVariant === intent ? "#2a2622" : "transparent",
+                                  color: activeVariant === intent ? "#f8f6f3" : "#9c958f",
+                                  transition: "all 0.12s",
+                                }}
+                              >
+                                {intent}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-              <textarea
-                value={script}
-                onChange={(e) => setScript(e.target.value)}
-                rows={8}
-                className="w-full bg-zinc-900/40 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-700 resize-none focus:outline-none focus:border-zinc-600 transition-colors leading-relaxed"
-                placeholder="Write your script here…"
-              />
-              {isOverScriptLimit && (
-                <p className="text-xs text-red-400 mt-1.5">
-                  Script exceeds {plan.label} plan limit ({plan.maxScriptCharacters} chars).
-                  Upgrade to write longer scripts.
-                </p>
-              )}
+            </section>
+
+            {/* ── Action bar ──────────────────────────────────────────────── */}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <ActionButton title="New composition" onClick={handleNewComposition}>✦</ActionButton>
+              <ActionButton
+                title={audioBlob ? "Download" : "Generate audio to download"}
+                onClick={handleDownload}
+                disabled={!audioBlob}
+              >
+                ↓
+              </ActionButton>
+              <ActionButton
+                title={canGenerate ? "Regenerate" : isAtLimit ? "Daily limit reached" : "Write a script to generate"}
+                onClick={generate}
+                disabled={!canGenerate}
+              >
+                ↺
+              </ActionButton>
+              <div style={{ flex: 1 }} />
+              <span style={{
+                fontSize: "11px", fontVariantNumeric: "tabular-nums",
+                color: isOverScriptLimit ? "#c4722a" : "#b5aca3",
+              }}>
+                {assembledScript.length} / {plan.maxScriptCharacters}
+              </span>
             </div>
 
-            {/* Error */}
+            {/* Inline messages */}
+            {isOverScriptLimit && (
+              <p style={{ fontSize: "12px", color: "#c4722a", margin: "-20px 0 0" }}>
+                Script exceeds {plan.label} plan limit ({plan.maxScriptCharacters} chars). Upgrade to write longer scripts.
+              </p>
+            )}
+            {isAtLimit && !isOverScriptLimit && (
+              <p style={{ fontSize: "12px", color: "#c4722a", margin: "-20px 0 0" }}>
+                Daily limit reached — resets at midnight UTC.
+              </p>
+            )}
             {generationError && (
-              <p className="text-xs text-red-400 leading-relaxed">{generationError}</p>
+              <p style={{ fontSize: "12px", color: "#c4722a", margin: "-20px 0 0" }}>
+                {generationError}
+              </p>
             )}
 
-            {/* ── Generate button ──────────────────────────────────────────── */}
+            {/* ── Paragraph editor ────────────────────────────────────────── */}
+            <section style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              {paragraphs.map((para) => (
+                <ParagraphBlock
+                  key={para.id}
+                  para={para}
+                  openPopoverId={openPopoverId}
+                  onTextChange={(text) => updateParagraphText(para.id, text)}
+                  onDirectionChange={(dir) => updateParagraphDirection(para.id, dir)}
+                  onOpenPopover={() => setOpenPopoverId(para.id)}
+                  onRemove={() => removeParagraph(para.id)}
+                  canRemove={paragraphs.length > 1}
+                />
+              ))}
+              <button
+                onClick={addParagraph}
+                style={{
+                  alignSelf: "flex-start", padding: "6px 14px", borderRadius: "8px",
+                  border: "1.5px dashed #d4cfc9", background: "transparent",
+                  fontSize: "12px", color: "#9c958f", cursor: "pointer",
+                  transition: "border-color 0.15s, color 0.15s",
+                }}
+              >
+                + paragraph
+              </button>
+            </section>
+
+            {/* Generate */}
             <button
               onClick={generate}
               disabled={!canGenerate}
-              className={`w-full py-3 rounded-xl text-sm font-medium transition-all ${
-                canGenerate
-                  ? "bg-white text-black hover:bg-zinc-100 active:bg-zinc-200"
-                  : "bg-zinc-900 text-zinc-600 cursor-not-allowed"
-              }`}
+              style={{
+                width: "100%", padding: "14px", borderRadius: "14px", border: "none",
+                fontSize: "14px", fontWeight: 500,
+                cursor: canGenerate ? "pointer" : "not-allowed",
+                background: canGenerate ? "#2a2622" : "#eae4de",
+                color: canGenerate ? "#f8f6f3" : "#b5aca3",
+                transition: "all 0.15s",
+              }}
             >
               {isGenerating
                 ? "Generating…"
@@ -436,74 +696,299 @@ function Composer() {
                 : "Generate"}
             </button>
 
-            {/* ── Player bar ───────────────────────────────────────────────── */}
-            {audioUrl && (
-              <div className="border border-zinc-800 rounded-xl px-4 py-3 flex items-center gap-3">
-                <audio ref={audioRef} src={audioUrl} preload="metadata" className="hidden" />
-
-                {/* Play / Pause */}
-                <button
-                  onClick={togglePlay}
-                  className="w-7 h-7 rounded-full bg-white text-black flex items-center justify-center text-xs shrink-0 hover:bg-zinc-200 transition-colors"
-                >
-                  {isPlaying ? "⏸" : "▶"}
-                </button>
-
-                {/* Current time */}
-                <span className="text-xs text-zinc-600 w-9 shrink-0 tabular-nums">
-                  {fmt(currentTime)}
-                </span>
-
-                {/* Scrubber */}
-                <input
-                  type="range"
-                  min={0}
-                  max={duration || 0}
-                  step={0.01}
-                  value={currentTime}
-                  onChange={handleSeek}
-                  className="flex-1 accent-white h-0.5 cursor-pointer"
-                />
-
-                {/* Duration */}
-                <span className="text-xs text-zinc-600 w-9 shrink-0 tabular-nums text-right">
-                  {fmt(duration)}
-                </span>
-
-                {/* Regenerate */}
-                <button
-                  onClick={generate}
-                  disabled={!canGenerate}
-                  title="Regenerate"
-                  className={`text-base px-1 transition-colors ${
-                    canGenerate
-                      ? "text-zinc-500 hover:text-white"
-                      : "text-zinc-800 cursor-not-allowed"
-                  }`}
-                >
-                  ↺
-                </button>
-
-                {/* Download */}
-                <button
-                  onClick={handleDownload}
-                  title="Download MP3"
-                  className="text-base px-1 text-zinc-500 hover:text-white transition-colors"
-                >
-                  ↓
-                </button>
-              </div>
-            )}
-
-            {/* ── Guardrail ────────────────────────────────────────────────── */}
-            <p className="text-[10px] text-zinc-800 leading-relaxed">
-              <span className="text-zinc-700">Guardrail · </span>
+            {/* Guardrail */}
+            <p style={{ fontSize: "11px", color: "#b5aca3", lineHeight: 1.6 }}>
+              <span style={{ color: "#9c958f" }}>Guardrail · </span>
               {activeVoice.guardrail}
             </p>
 
           </div>
         </main>
       </div>
+
+      {/* ── History sidebar ──────────────────────────────────────────────── */}
+      {sidebarOpen && (
+        <div
+          ref={sidebarRef}
+          style={{
+            position: "fixed", top: 0, left: "52px", bottom: 0, width: "300px", zIndex: 100,
+            background: "#ffffff", borderRight: "1px solid #eae4de",
+            display: "flex", flexDirection: "column",
+            boxShadow: "4px 0 24px rgba(42,38,34,0.08)",
+          }}
+        >
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid #eae4de", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <p style={{ fontSize: "12px", fontWeight: 600, color: "#2a2622", margin: 0 }}>History</p>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              style={{ background: "none", border: "none", color: "#9c958f", cursor: "pointer", fontSize: "18px", lineHeight: 1, padding: "0 2px" }}
+            >
+              ×
+            </button>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: "12px" }}>
+            {loadingCompositions ? (
+              <p style={{ fontSize: "12px", color: "#b5aca3", textAlign: "center", paddingTop: "40px" }}>Loading…</p>
+            ) : compositions.length === 0 ? (
+              <p style={{ fontSize: "12px", color: "#b5aca3", textAlign: "center", paddingTop: "40px", lineHeight: 1.6 }}>
+                No compositions yet.<br />Generate one to save it here.
+              </p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {compositions.map((comp) => {
+                  const voice = voices.find((v) => v.id === comp.voice_id)
+                  const date = new Date(comp.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                  const preview = comp.title ?? comp.script.slice(0, 60)
+                  return (
+                    <div
+                      key={comp.id}
+                      onClick={() => restoreComposition(comp)}
+                      style={{
+                        borderRadius: "10px", border: "1px solid #eae4de",
+                        padding: "10px 12px", cursor: "pointer",
+                        display: "flex", flexDirection: "column", gap: "4px",
+                      }}
+                    >
+                      {voice && (
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <div style={{
+                            width: "10px", height: "10px", borderRadius: "50%", flexShrink: 0,
+                            background: `linear-gradient(135deg, ${voice.gradientFrom}, ${voice.gradientTo})`,
+                          }} />
+                          <span style={{ fontSize: "10px", fontWeight: 600, color: "#756d65" }}>
+                            {voice.archetype} · {comp.variant}
+                          </span>
+                        </div>
+                      )}
+                      <p style={{ fontSize: "12px", color: "#2a2622", margin: 0, lineHeight: 1.4 }}>
+                        {preview}
+                      </p>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
+                        <span style={{ fontSize: "10px", color: "#b5aca3" }}>{date}</span>
+                        {comp.duration_s != null && (
+                          <span style={{ fontSize: "10px", color: "#b5aca3" }}>{fmt(comp.duration_s)}</span>
+                        )}
+                        <div style={{ flex: 1 }} />
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deleteComposition(comp.id) }}
+                          title="Delete"
+                          style={{ background: "none", border: "none", color: "#d4cfc9", cursor: "pointer", fontSize: "16px", lineHeight: 1, padding: "2px" }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Fixed player bar ────────────────────────────────────────────── */}
+      {audioUrl && (
+        <div style={{
+          position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 50,
+          padding: "12px 24px",
+          background: "rgba(248,246,243,0.96)", backdropFilter: "blur(16px)",
+          borderTop: "1px solid #eae4de",
+          display: "flex", alignItems: "center", gap: "16px",
+        }}>
+          {/* Voice swatch + info */}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: "160px" }}>
+            <div style={{
+              width: "32px", height: "32px", borderRadius: "8px", flexShrink: 0,
+              background: `linear-gradient(135deg, ${activeVoice.gradientFrom}, ${activeVoice.gradientTo})`,
+            }} />
+            <div>
+              <p style={{ fontSize: "12px", fontWeight: 600, color: "#2a2622", margin: 0, lineHeight: 1.2 }}>
+                {activeVoice.archetype}
+              </p>
+              <p style={{ fontSize: "10px", color: "#9c958f", margin: 0 }}>{activeVariant}</p>
+            </div>
+          </div>
+
+          {/* Playback controls */}
+          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "12px" }}>
+            <button
+              onClick={togglePlay}
+              style={{
+                width: "32px", height: "32px", borderRadius: "50%",
+                background: "#2a2622", color: "#f8f6f3", border: "none",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "12px", cursor: "pointer", flexShrink: 0,
+              }}
+            >
+              {isPlaying ? "⏸" : "▶"}
+            </button>
+            <span style={{ fontSize: "11px", color: "#9c958f", fontVariantNumeric: "tabular-nums", width: "36px" }}>
+              {fmt(currentTime)}
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={duration || 0}
+              step={0.01}
+              value={currentTime}
+              onChange={handleSeek}
+              style={{ flex: 1, accentColor: "#2a2622", height: "2px", cursor: "pointer" }}
+            />
+            <span style={{ fontSize: "11px", color: "#9c958f", fontVariantNumeric: "tabular-nums", width: "36px", textAlign: "right" }}>
+              {fmt(duration)}
+            </span>
+          </div>
+
+          {/* Right actions */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <ActionButton title="Download" onClick={handleDownload}>↓</ActionButton>
+            <ActionButton
+              title={canGenerate ? "Regenerate" : "Cannot regenerate now"}
+              onClick={generate}
+              disabled={!canGenerate}
+            >
+              ↺
+            </ActionButton>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+function ActionButton({
+  children,
+  title,
+  onClick,
+  disabled = false,
+}: {
+  children: React.ReactNode
+  title: string
+  onClick: () => void
+  disabled?: boolean
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      style={{
+        width: "32px", height: "32px", borderRadius: "8px",
+        border: "1.5px solid #eae4de", background: "transparent",
+        color: disabled ? "#d4cfc9" : "#756d65",
+        cursor: disabled ? "not-allowed" : "pointer",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: "15px", transition: "all 0.12s",
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
+function ParagraphBlock({
+  para,
+  openPopoverId,
+  onTextChange,
+  onDirectionChange,
+  onOpenPopover,
+  onRemove,
+  canRemove,
+}: {
+  para: Paragraph
+  openPopoverId: string | null
+  onTextChange: (text: string) => void
+  onDirectionChange: (direction: string) => void
+  onOpenPopover: () => void
+  onRemove: () => void
+  canRemove: boolean
+}) {
+  const isOpen = openPopoverId === para.id
+
+  return (
+    <div style={{ position: "relative" }}>
+      {/* Direction chip row */}
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+        <button
+          onClick={onOpenPopover}
+          style={{
+            padding: "3px 10px", borderRadius: "100px",
+            border: "1.5px solid #eae4de", background: "#ffffff",
+            fontSize: "10px", fontWeight: 600, color: "#756d65",
+            cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.08em",
+          }}
+        >
+          {para.direction}
+        </button>
+        {canRemove && (
+          <button
+            onClick={onRemove}
+            title="Remove paragraph"
+            style={{
+              width: "18px", height: "18px", borderRadius: "50%", border: "none",
+              background: "transparent", color: "#d4cfc9", cursor: "pointer",
+              fontSize: "14px", display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+          >
+            ×
+          </button>
+        )}
+      </div>
+
+      {/* Direction popover */}
+      {isOpen && (
+        <div
+          id={`popover-${para.id}`}
+          style={{
+            position: "absolute", top: "30px", left: 0, zIndex: 200,
+            background: "#ffffff", border: "1px solid #eae4de",
+            borderRadius: "12px", padding: "12px",
+            boxShadow: "0 8px 24px rgba(42,38,34,0.12)",
+            display: "flex", flexWrap: "wrap", gap: "6px",
+            width: "280px",
+          }}
+        >
+          {DIRECTIONS.map((dir) => (
+            <button
+              key={dir}
+              onClick={() => onDirectionChange(dir)}
+              style={{
+                padding: "4px 10px", borderRadius: "100px",
+                border: `1.5px solid ${para.direction === dir ? "#2a2622" : "#d4cfc9"}`,
+                fontSize: "11px", fontWeight: 500, cursor: "pointer",
+                background: para.direction === dir ? "#2a2622" : "transparent",
+                color: para.direction === dir ? "#f8f6f3" : "#756d65",
+                transition: "all 0.1s",
+              }}
+            >
+              {dir}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Textarea */}
+      <textarea
+        value={para.text}
+        onChange={(e) => onTextChange(e.target.value)}
+        rows={3}
+        placeholder="Write your script here…"
+        style={{
+          width: "100%", boxSizing: "border-box",
+          background: "#ffffff", border: "1.5px solid #eae4de",
+          borderRadius: "12px", padding: "14px 16px",
+          fontSize: "20px", lineHeight: "1.75",
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          color: "#2a2622", resize: "vertical",
+          outline: "none", transition: "border-color 0.15s",
+        }}
+        onFocus={(e) => { e.currentTarget.style.borderColor = "#c4977f" }}
+        onBlur={(e) => { e.currentTarget.style.borderColor = "#eae4de" }}
+      />
     </div>
   )
 }
