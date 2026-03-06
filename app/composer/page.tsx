@@ -7,10 +7,7 @@ import { getPlanConfig, remainingGenerations, resolvePlanId, hasPaidPlan } from 
 
 const FRAMER_URL = "https://formal-organization-793965.framer.app"
 
-const INLINE_ACTING_DIRECTIONS = [
-  "Conversational", "Intimate", "Warm", "Urgent", "Reassuring",
-  "Emphasis", "Pause", "Soft", "Confident", "Playful",
-]
+const INLINE_DIRECTIONS = ["Emphasis", "Pause", "Whisper", "Slow"]
 
 // ---------------------------------------------------------------------------
 // Types
@@ -90,16 +87,15 @@ function getSelectionCharOffsets(el: HTMLElement): { start: number; end: number 
 }
 
 function getDirectionOptions(voiceIntents: string[]): string[] {
-  const extra = INLINE_ACTING_DIRECTIONS.filter((d) => !voiceIntents.includes(d))
-  return [...voiceIntents, ...extra]
+  return [...voiceIntents, ...INLINE_DIRECTIONS.filter((d) => !voiceIntents.includes(d))]
 }
 
-function assembleSegments(paragraphs: Paragraph[]): Array<{ text: string; intent: string }> {
+function assembleSegments(paragraphs: Paragraph[], activeVariant: string): Array<{ text: string; intent: string }> {
   const segments: Array<{ text: string; intent: string }> = []
   for (const para of paragraphs) {
     if (!para.text.trim()) continue
     if (!para.marks.length) {
-      segments.push({ text: para.text, intent: para.direction })
+      segments.push({ text: para.text, intent: activeVariant })
       continue
     }
     const sorted = [...para.marks].sort((a, b) => a.start - b.start)
@@ -107,7 +103,7 @@ function assembleSegments(paragraphs: Paragraph[]): Array<{ text: string; intent
     for (const mark of sorted) {
       if (mark.start > cursor) {
         const chunk = para.text.slice(cursor, mark.start)
-        if (chunk.trim()) segments.push({ text: chunk, intent: para.direction })
+        if (chunk.trim()) segments.push({ text: chunk, intent: activeVariant })
       }
       const marked = para.text.slice(mark.start, mark.end)
       if (marked.trim()) segments.push({ text: marked, intent: mark.direction })
@@ -115,7 +111,7 @@ function assembleSegments(paragraphs: Paragraph[]): Array<{ text: string; intent
     }
     if (cursor < para.text.length) {
       const tail = para.text.slice(cursor)
-      if (tail.trim()) segments.push({ text: tail, intent: para.direction })
+      if (tail.trim()) segments.push({ text: tail, intent: activeVariant })
     }
   }
   return segments
@@ -178,7 +174,10 @@ function Composer() {
   const [paragraphs, setParagraphs] = useState<Paragraph[]>([
     { id: crypto.randomUUID(), text: "", direction: "Conversational", marks: [] },
   ])
-  const [openPopoverId, setOpenPopoverId] = useState<string | null>(null)
+
+  // Voice pill hover popover
+  const [hoveredVoiceId, setHoveredVoiceId] = useState<string | null>(null)
+  const hoverLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Selection toolbar
   const [selectionInfo, setSelectionInfo] = useState<{
@@ -281,11 +280,6 @@ function Composer() {
     )
   }
 
-  function updateParagraphDirection(id: string, direction: string) {
-    setParagraphs((prev) => prev.map((p) => (p.id === id ? { ...p, direction } : p)))
-    setOpenPopoverId(null)
-  }
-
   function removeParagraph(id: string) {
     setParagraphs((prev) => (prev.length === 1 ? prev : prev.filter((p) => p.id !== id)))
   }
@@ -349,7 +343,7 @@ function Composer() {
           variant: activeVariant,
           script: assembledScript,
           direction: { mode: "inline", intent: activeVariant },
-          segments: assembleSegments(paragraphs),
+          segments: assembleSegments(paragraphs, activeVariant),
         }),
       })
 
@@ -449,16 +443,6 @@ function Composer() {
   // ---------------------------------------------------------------------------
   // Effects
   // ---------------------------------------------------------------------------
-
-  useEffect(() => {
-    if (!openPopoverId) return
-    function onMouseDown(e: MouseEvent) {
-      const popover = document.getElementById(`popover-${openPopoverId}`)
-      if (popover && !popover.contains(e.target as Node)) setOpenPopoverId(null)
-    }
-    document.addEventListener("mousedown", onMouseDown)
-    return () => document.removeEventListener("mousedown", onMouseDown)
-  }, [openPopoverId])
 
   useEffect(() => {
     if (!sidebarOpen) return
@@ -594,76 +578,121 @@ function Composer() {
             height: "100%",
           }}
         >
+          {/* Eyebrow label */}
+          <span style={{
+            fontSize: "10px", fontWeight: 600, letterSpacing: "0.15em",
+            color: "#b5aca3", textTransform: "uppercase", flexShrink: 0,
+          }}>PERFORMERS</span>
+
+          {/* Divider after eyebrow */}
+          <div style={{ width: "1px", height: "20px", background: "#eae4de", flexShrink: 0, margin: "0 4px" }} />
+
           {/* Voice pills */}
           {voices.map((voice) => {
             const isActive = activeVoice.id === voice.id
+            const voiceName = voice.title.split(" · ")[0]
             return (
-              <button
+              <div
                 key={voice.id}
-                onClick={() => selectVoice(voice)}
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: "6px",
-                  height: "32px", padding: "0 12px",
-                  borderRadius: "100px",
-                  border: isActive ? "none" : "1px solid #d4cfc9",
-                  background: isActive ? "#2a2622" : "transparent",
-                  color: isActive ? "#f8f6f3" : "#756d65",
-                  fontSize: "12px", fontWeight: isActive ? 500 : 400,
-                  cursor: "pointer", flexShrink: 0,
-                  transition: "all 0.12s",
+                style={{ position: "relative", flexShrink: 0 }}
+                onMouseEnter={() => {
+                  if (hoverLeaveTimerRef.current) clearTimeout(hoverLeaveTimerRef.current)
+                  setHoveredVoiceId(voice.id)
+                }}
+                onMouseLeave={() => {
+                  hoverLeaveTimerRef.current = setTimeout(() => setHoveredVoiceId(null), 150)
                 }}
               >
-                <span style={{
-                  width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
-                  background: voice.gradientFrom,
-                  opacity: isActive ? 0.7 : 1,
-                }} />
-                {voice.archetype}
-              </button>
+                <button
+                  onClick={() => selectVoice(voice)}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: "6px",
+                    height: "32px", padding: "0 12px",
+                    borderRadius: "100px",
+                    border: isActive ? "none" : "1px solid #d4cfc9",
+                    background: isActive ? "#2a2622" : "transparent",
+                    color: isActive ? "#f8f6f3" : "#756d65",
+                    fontSize: "12px", fontWeight: isActive ? 500 : 400,
+                    cursor: "pointer",
+                    transition: "all 0.12s",
+                  }}
+                >
+                  <span style={{
+                    width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
+                    background: voice.gradientFrom,
+                    opacity: isActive ? 0.7 : 1,
+                  }} />
+                  {voiceName}
+                </button>
+
+                {/* Hover popover */}
+                {hoveredVoiceId === voice.id && (
+                  <div
+                    onMouseEnter={() => {
+                      if (hoverLeaveTimerRef.current) clearTimeout(hoverLeaveTimerRef.current)
+                    }}
+                    onMouseLeave={() => {
+                      hoverLeaveTimerRef.current = setTimeout(() => setHoveredVoiceId(null), 150)
+                    }}
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 8px)",
+                      left: 0,
+                      background: "#ffffff",
+                      border: "1px solid #eae4de",
+                      borderRadius: "12px",
+                      padding: "16px",
+                      boxShadow: "0 8px 24px rgba(42,38,34,0.1)",
+                      width: "220px",
+                      zIndex: 200,
+                    }}
+                  >
+                    <p style={{ fontSize: "13px", fontWeight: 600, color: "#2a2622", margin: "0 0 2px" }}>{voiceName}</p>
+                    <p style={{ fontSize: "11px", color: "#9c958f", margin: "0 0 8px" }}>{voice.archetype}</p>
+                    <p style={{ fontSize: "12px", color: "#756d65", lineHeight: 1.5, margin: "0 0 12px" }}>{voice.blurb}</p>
+
+                    {/* Variant pills */}
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" }}>
+                      {voice.intents.map((intent) => {
+                        const isActiveVariant = activeVoice.id === voice.id && activeVariant === intent
+                        return (
+                          <button
+                            key={intent}
+                            onClick={() => { selectVoice(voice); setActiveVariant(intent) }}
+                            style={{
+                              padding: "3px 10px", borderRadius: "100px",
+                              border: isActiveVariant ? "none" : "1px solid #d4cfc9",
+                              background: isActiveVariant ? "#2a2622" : "transparent",
+                              color: isActiveVariant ? "#f8f6f3" : "#756d65",
+                              fontSize: "11px", fontWeight: isActiveVariant ? 500 : 400,
+                              cursor: "pointer", transition: "all 0.12s",
+                            }}
+                          >
+                            {intent}
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {/* Play sample button */}
+                    <button
+                      onClick={() => toggleSamplePlay(voice)}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: "6px",
+                        padding: "4px 10px", borderRadius: "100px",
+                        border: "1px solid #d4cfc9", background: "transparent",
+                        color: "#756d65", fontSize: "11px", cursor: "pointer",
+                        transition: "all 0.12s",
+                      }}
+                    >
+                      {playingSampleId === voice.id ? "⏸" : "▶"}
+                      <span>Sample</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             )
           })}
-
-          {/* Divider */}
-          <div style={{ width: "1px", height: "20px", background: "#eae4de", flexShrink: 0, margin: "0 2px" }} />
-
-          {/* Variant pills for active voice */}
-          {activeVoice.intents.map((intent) => {
-            const isActive = activeVariant === intent
-            return (
-              <button
-                key={intent}
-                onClick={() => setActiveVariant(intent)}
-                style={{
-                  display: "inline-flex", alignItems: "center",
-                  height: "32px", padding: "0 12px",
-                  borderRadius: "100px",
-                  border: isActive ? "none" : "1px solid #d4cfc9",
-                  background: isActive ? "#2a2622" : "transparent",
-                  color: isActive ? "#f8f6f3" : "#756d65",
-                  fontSize: "12px", fontWeight: isActive ? 500 : 400,
-                  cursor: "pointer", flexShrink: 0,
-                  transition: "all 0.12s",
-                }}
-              >
-                {intent}
-              </button>
-            )
-          })}
-
-          {/* Sample play button */}
-          <button
-            onClick={() => toggleSamplePlay(activeVoice)}
-            title={`Preview ${activeVoice.archetype}`}
-            style={{
-              width: "28px", height: "28px", borderRadius: "50%",
-              border: "1px solid #d4cfc9", background: "transparent",
-              color: "#756d65", cursor: "pointer", flexShrink: 0,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "11px", transition: "all 0.12s",
-            }}
-          >
-            {playingSampleId === activeVoice.id ? "⏸" : "▶"}
-          </button>
         </div>
       </div>
 
@@ -718,11 +747,7 @@ function Composer() {
               <ParagraphBlock
                 key={para.id}
                 para={para}
-                openPopoverId={openPopoverId}
-                directionOptions={directionOptions}
                 onTextChange={(text) => updateParagraphText(para.id, text)}
-                onDirectionChange={(dir) => updateParagraphDirection(para.id, dir)}
-                onOpenPopover={() => setOpenPopoverId(para.id)}
                 onRemove={() => removeParagraph(para.id)}
                 canRemove={paragraphs.length > 1}
                 onSelectionChange={(info) =>
@@ -900,12 +925,12 @@ function ActionButton({
       title={title}
       className="lyric-action-btn"
       style={{
-        width: "32px", height: "32px", borderRadius: "8px",
+        width: "36px", height: "36px", borderRadius: "8px",
         border: "none", background: "transparent",
         color: disabled ? "#d4cfc9" : "#756d65",
         cursor: disabled ? "not-allowed" : "pointer",
         display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: "15px", transition: "background 0.12s",
+        fontSize: "20px", transition: "background 0.12s",
       }}
     >
       {children}
@@ -961,23 +986,17 @@ function SelectionToolbar({
 }
 
 function ParagraphBlock({
-  para, openPopoverId, directionOptions,
-  onTextChange, onDirectionChange, onOpenPopover,
-  onRemove, canRemove, onSelectionChange, onMarkRemove,
+  para,
+  onTextChange, onRemove, canRemove, onSelectionChange, onMarkRemove,
 }: {
   para: Paragraph
-  openPopoverId: string | null
-  directionOptions: string[]
   onTextChange: (text: string) => void
-  onDirectionChange: (direction: string) => void
-  onOpenPopover: () => void
   onRemove: () => void
   canRemove: boolean
   onSelectionChange: (info: { rectLeft: number; rectTop: number; rectWidth: number; offsets: { start: number; end: number } } | null) => void
   onMarkRemove: (markId: string) => void
 }) {
   const editorRef = useRef<HTMLDivElement>(null)
-  const isOpen = openPopoverId === para.id
 
   useLayoutEffect(() => {
     if (editorRef.current) {
@@ -1011,21 +1030,9 @@ function ParagraphBlock({
   return (
     <div style={{ position: "relative" }}>
 
-      {/* Direction chip row */}
-      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px", position: "relative" }}>
-        <button
-          onClick={onOpenPopover}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: "4px",
-            padding: "3px 8px", borderRadius: "100px",
-            background: "#f0ebe6", border: "none",
-            fontSize: "12px", color: "#8a7d74", cursor: "pointer",
-          }}
-        >
-          <span style={{ fontSize: "10px" }}>✏</span>
-          {para.direction}
-        </button>
-        {canRemove && (
+      {/* Remove button */}
+      {canRemove && (
+        <div style={{ display: "flex", marginBottom: "6px" }}>
           <button
             onClick={onRemove}
             title="Remove paragraph"
@@ -1033,42 +1040,8 @@ function ParagraphBlock({
           >
             ×
           </button>
-        )}
-
-        {/* Popover — opens ABOVE chip */}
-        {isOpen && (
-          <div
-            id={`popover-${para.id}`}
-            style={{
-              position: "absolute",
-              bottom: "calc(100% + 6px)",
-              left: 0, zIndex: 200,
-              background: "#ffffff", border: "1px solid #eae4de",
-              borderRadius: "12px", padding: "12px",
-              boxShadow: "0 8px 24px rgba(42,38,34,0.12)",
-              display: "flex", flexWrap: "wrap", gap: "6px",
-              width: "280px",
-            }}
-          >
-            {directionOptions.map((dir) => (
-              <button
-                key={dir}
-                onClick={() => onDirectionChange(dir)}
-                style={{
-                  padding: "4px 10px", borderRadius: "100px",
-                  border: `1.5px solid ${para.direction === dir ? "#2a2622" : "#d4cfc9"}`,
-                  fontSize: "11px", fontWeight: 500, cursor: "pointer",
-                  background: para.direction === dir ? "#2a2622" : "transparent",
-                  color: para.direction === dir ? "#f8f6f3" : "#756d65",
-                  transition: "all 0.1s",
-                }}
-              >
-                {dir}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Contenteditable body */}
       <div
