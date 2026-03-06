@@ -43,7 +43,7 @@ interface Composition {
 }
 
 // ---------------------------------------------------------------------------
-// Pure helpers
+// Pure helpers — unchanged
 // ---------------------------------------------------------------------------
 
 function escapeHtml(str: string): string {
@@ -208,7 +208,7 @@ function Composer() {
   // Usage — optimistic client-side tracking
   const [usedToday, setUsedToday] = useState(0)
 
-  // History sidebar
+  // History drawer
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [compositions, setCompositions] = useState<Composition[]>([])
   const [loadingCompositions, setLoadingCompositions] = useState(false)
@@ -402,7 +402,7 @@ function Composer() {
   }
 
   // ---------------------------------------------------------------------------
-  // History sidebar
+  // History drawer
   // ---------------------------------------------------------------------------
 
   const loadCompositions = useCallback(async () => {
@@ -523,10 +523,10 @@ function Composer() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div style={{ minHeight: "100vh", background: "#eceae7", display: "flex", flexDirection: "column", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#f8f6f3", display: "flex", flexDirection: "column", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
 
-      {/* CSS: mark labels, placeholder, contenteditable focus, hover */}
       <style>{`
+        html, body { background: #f8f6f3 !important; margin: 0; }
         [data-mark-direction]::after {
           content: attr(data-mark-direction);
           display: inline-block; font-size: 9px;
@@ -540,14 +540,15 @@ function Composer() {
           content: attr(data-placeholder); color: #b5aca3; pointer-events: none; display: block;
         }
         [contenteditable]:focus { outline: none; }
-        .lyric-voice-card:hover { border-color: #eae4de !important; }
         .lyric-action-btn:hover:not(:disabled) { background: #e4e0db !important; }
+        .lyric-toolbar-row { scrollbar-width: none; }
+        .lyric-toolbar-row::-webkit-scrollbar { display: none; }
       `}</style>
 
       {/* Hidden audio */}
       <audio ref={audioRef} src={audioUrl ?? undefined} preload="metadata" style={{ display: "none" }} />
 
-      {/* ── Topbar ──────────────────────────────────────────────────────── */}
+      {/* ── Top bar (52px, sticky) ───────────────────────────────────────── */}
       <header style={{
         position: "sticky", top: 0, zIndex: 50,
         height: "52px", padding: "0 24px",
@@ -577,122 +578,101 @@ function Composer() {
         </div>
       </header>
 
-      {/* ── 3-column layout ─────────────────────────────────────────────── */}
-      <div style={{ display: "flex", flex: 1 }}>
-
-        {/* ── Left panel (260px) ────────────────────────────────────────── */}
-        <div style={{
-          width: "260px", flexShrink: 0,
-          background: "#f5f3f0",
-          borderRight: "1px solid #eae4de",
-          display: "flex", flexDirection: "column",
-          overflowY: "auto",
-          padding: "16px 12px 16px",
-          gap: "6px",
-        }}>
-          <p style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.15em", color: "#b5aca3", textTransform: "uppercase", margin: "0 0 6px 4px" }}>
-            Voice
-          </p>
-
+      {/* ── Voice toolbar (48px, sticky below top bar) ───────────────────── */}
+      <div style={{
+        position: "sticky", top: "52px", zIndex: 40,
+        height: "48px",
+        background: "rgba(248,246,243,0.96)", backdropFilter: "blur(16px)",
+        borderBottom: "1px solid #eae4de",
+      }}>
+        <div
+          className="lyric-toolbar-row"
+          style={{
+            display: "flex", alignItems: "center", gap: "6px",
+            overflowX: "auto",
+            padding: "0 24px",
+            height: "100%",
+          }}
+        >
+          {/* Voice pills */}
           {voices.map((voice) => {
             const isActive = activeVoice.id === voice.id
             return (
-              <div
+              <button
                 key={voice.id}
-                className="lyric-voice-card"
                 onClick={() => selectVoice(voice)}
                 style={{
-                  borderRadius: "12px",
-                  background: isActive ? "#ffffff" : "transparent",
-                  border: `1.5px solid ${isActive ? "#c4977f" : "transparent"}`,
-                  overflow: "hidden", cursor: "pointer",
-                  transition: "border-color 0.15s, background 0.15s",
-                  boxShadow: isActive ? "0 1px 6px rgba(196,151,127,0.12)" : "none",
+                  display: "inline-flex", alignItems: "center", gap: "6px",
+                  height: "32px", padding: "0 12px",
+                  borderRadius: "100px",
+                  border: isActive ? "none" : "1px solid #d4cfc9",
+                  background: isActive ? "#2a2622" : "transparent",
+                  color: isActive ? "#f8f6f3" : "#756d65",
+                  fontSize: "12px", fontWeight: isActive ? 500 : 400,
+                  cursor: "pointer", flexShrink: 0,
+                  transition: "all 0.12s",
                 }}
               >
-                {/* Gradient swatch with play button */}
-                <div style={{
-                  height: "72px",
-                  background: `linear-gradient(135deg, ${voice.gradientFrom}, ${voice.gradientTo})`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); toggleSamplePlay(voice) }}
-                    title="Preview sample"
-                    style={{
-                      width: "32px", height: "32px", borderRadius: "50%",
-                      background: "rgba(255,255,255,0.85)", border: "none",
-                      cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: "13px", color: "#2a2622",
-                      boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
-                    }}
-                  >
-                    {playingSampleId === voice.id ? "⏸" : "▶"}
-                  </button>
-                </div>
-
-                {/* Name + archetype */}
-                <div style={{ padding: "10px 12px" }}>
-                  <p style={{ fontSize: "12px", fontWeight: 600, color: "#2a2622", margin: "0 0 2px" }}>
-                    {voice.title}
-                  </p>
-                  <p style={{ fontSize: "11px", color: "#9c958f", margin: 0 }}>
-                    {voice.archetype}
-                  </p>
-
-                  {/* Variant pills — active card only */}
-                  {isActive && (
-                    <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "10px" }}>
-                      {voice.intents.map((intent) => (
-                        <button
-                          key={intent}
-                          onClick={(e) => { e.stopPropagation(); setActiveVariant(intent) }}
-                          style={{
-                            padding: "2px 8px", borderRadius: "100px",
-                            border: `1.5px solid ${activeVariant === intent ? "#2a2622" : "#d4cfc9"}`,
-                            fontSize: "10px", fontWeight: 500, cursor: "pointer",
-                            background: activeVariant === intent ? "#2a2622" : "transparent",
-                            color: activeVariant === intent ? "#f8f6f3" : "#9c958f",
-                            transition: "all 0.12s",
-                          }}
-                        >
-                          {intent}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+                <span style={{
+                  width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
+                  background: voice.gradientFrom,
+                  opacity: isActive ? 0.7 : 1,
+                }} />
+                {voice.archetype}
+              </button>
             )
           })}
 
-          {/* History button */}
-          <div style={{ flex: 1, minHeight: "16px" }} />
+          {/* Divider */}
+          <div style={{ width: "1px", height: "20px", background: "#eae4de", flexShrink: 0, margin: "0 2px" }} />
+
+          {/* Variant pills for active voice */}
+          {activeVoice.intents.map((intent) => {
+            const isActive = activeVariant === intent
+            return (
+              <button
+                key={intent}
+                onClick={() => setActiveVariant(intent)}
+                style={{
+                  display: "inline-flex", alignItems: "center",
+                  height: "32px", padding: "0 12px",
+                  borderRadius: "100px",
+                  border: isActive ? "none" : "1px solid #d4cfc9",
+                  background: isActive ? "#2a2622" : "transparent",
+                  color: isActive ? "#f8f6f3" : "#756d65",
+                  fontSize: "12px", fontWeight: isActive ? 500 : 400,
+                  cursor: "pointer", flexShrink: 0,
+                  transition: "all 0.12s",
+                }}
+              >
+                {intent}
+              </button>
+            )
+          })}
+
+          {/* Sample play button */}
           <button
-            onClick={openSidebar}
+            onClick={() => toggleSamplePlay(activeVoice)}
+            title={`Preview ${activeVoice.archetype}`}
             style={{
-              width: "100%", padding: "8px 12px", borderRadius: "8px",
-              border: "1.5px solid #eae4de",
-              background: sidebarOpen ? "#eae4de" : "transparent",
-              fontSize: "11px", color: "#756d65", cursor: "pointer",
-              display: "flex", alignItems: "center", gap: "6px",
-              transition: "background 0.15s",
+              width: "28px", height: "28px", borderRadius: "50%",
+              border: "1px solid #d4cfc9", background: "transparent",
+              color: "#756d65", cursor: "pointer", flexShrink: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "11px", transition: "all 0.12s",
             }}
           >
-            <span>◷</span>
-            <span>History</span>
+            {playingSampleId === activeVoice.id ? "⏸" : "▶"}
           </button>
         </div>
+      </div>
 
-        {/* ── Center area ───────────────────────────────────────────────── */}
-        <main style={{
-          flex: 1, overflowY: "auto",
-          padding: "32px 24px 200px",
-          display: "flex", flexDirection: "column", alignItems: "center",
-        }}>
+      {/* ── Script area ──────────────────────────────────────────────────── */}
+      <main style={{ flex: 1, padding: "0 24px" }}>
+        <div style={{ maxWidth: "680px", margin: "0 auto", padding: "48px 0 200px" }}>
 
           {/* Action bar */}
-          <div style={{ width: "100%", maxWidth: "680px", display: "flex", alignItems: "center", gap: "4px", marginBottom: "16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "24px" }}>
             <ActionButton title="New composition" onClick={handleNewComposition}>✦</ActionButton>
             <ActionButton
               title={audioBlob ? "Download" : "Generate audio to download"}
@@ -708,99 +688,91 @@ function Composer() {
             >
               ↺
             </ActionButton>
+            <ActionButton title="History" onClick={openSidebar}>◷</ActionButton>
             <div style={{ flex: 1 }} />
             <span style={{ fontSize: "11px", fontVariantNumeric: "tabular-nums", color: isOverScriptLimit ? "#c4722a" : "#b5aca3" }}>
               {assembledScript.length} / {plan.maxScriptCharacters}
             </span>
           </div>
 
-          {/* Inline status messages */}
+          {/* Status messages */}
           {isOverScriptLimit && (
-            <p style={{ width: "100%", maxWidth: "680px", fontSize: "12px", color: "#c4722a", margin: "-8px 0 12px" }}>
+            <p style={{ fontSize: "12px", color: "#c4722a", margin: "0 0 16px" }}>
               Script exceeds {plan.label} plan limit ({plan.maxScriptCharacters} chars). Upgrade to write longer scripts.
             </p>
           )}
           {isAtLimit && !isOverScriptLimit && (
-            <p style={{ width: "100%", maxWidth: "680px", fontSize: "12px", color: "#c4722a", margin: "-8px 0 12px" }}>
+            <p style={{ fontSize: "12px", color: "#c4722a", margin: "0 0 16px" }}>
               Daily limit reached — resets at midnight UTC.
             </p>
           )}
           {generationError && (
-            <p style={{ width: "100%", maxWidth: "680px", fontSize: "12px", color: "#c4722a", margin: "-8px 0 12px" }}>
+            <p style={{ fontSize: "12px", color: "#c4722a", margin: "0 0 16px" }}>
               {generationError}
             </p>
           )}
 
-          {/* Floating white canvas */}
-          <div style={{
-            width: "100%", maxWidth: "680px",
-            background: "#ffffff",
-            borderRadius: "4px",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)",
-            padding: "48px 56px",
-          }}>
-
-            {/* Paragraph blocks */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
-              {paragraphs.map((para) => (
-                <ParagraphBlock
-                  key={para.id}
-                  para={para}
-                  openPopoverId={openPopoverId}
-                  directionOptions={directionOptions}
-                  onTextChange={(text) => updateParagraphText(para.id, text)}
-                  onDirectionChange={(dir) => updateParagraphDirection(para.id, dir)}
-                  onOpenPopover={() => setOpenPopoverId(para.id)}
-                  onRemove={() => removeParagraph(para.id)}
-                  canRemove={paragraphs.length > 1}
-                  onSelectionChange={(info) =>
-                    setSelectionInfo(info ? { paraId: para.id, ...info } : null)
-                  }
-                  onMarkRemove={(markId) => removeMark(para.id, markId)}
-                />
-              ))}
-            </div>
-
-            {/* + paragraph */}
-            <button
-              onClick={addParagraph}
-              style={{
-                marginTop: "24px",
-                padding: "6px 14px", borderRadius: "8px",
-                border: "1.5px dashed #d4cfc9", background: "transparent",
-                fontSize: "12px", color: "#9c958f", cursor: "pointer",
-                transition: "border-color 0.15s, color 0.15s",
-              }}
-            >
-              + paragraph
-            </button>
-
-            {/* Generate button */}
-            <button
-              onClick={generate}
-              disabled={!canGenerate}
-              style={{
-                width: "100%", padding: "14px", borderRadius: "14px", border: "none",
-                fontSize: "14px", fontWeight: 500, marginTop: "32px",
-                cursor: canGenerate ? "pointer" : "not-allowed",
-                background: canGenerate ? "#2a2622" : "#eae4de",
-                color: canGenerate ? "#f8f6f3" : "#b5aca3",
-                transition: "all 0.15s",
-              }}
-            >
-              {isGenerating ? "Generating…" : isAtLimit ? "Daily limit reached — resets at midnight UTC" : "Generate"}
-            </button>
-
-            {/* Guardrail */}
-            <p style={{ fontSize: "11px", color: "#b5aca3", lineHeight: 1.6, marginTop: "16px" }}>
-              <span style={{ color: "#9c958f" }}>Guardrail · </span>
-              {activeVoice.guardrail}
-            </p>
+          {/* Paragraph blocks */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
+            {paragraphs.map((para) => (
+              <ParagraphBlock
+                key={para.id}
+                para={para}
+                openPopoverId={openPopoverId}
+                directionOptions={directionOptions}
+                onTextChange={(text) => updateParagraphText(para.id, text)}
+                onDirectionChange={(dir) => updateParagraphDirection(para.id, dir)}
+                onOpenPopover={() => setOpenPopoverId(para.id)}
+                onRemove={() => removeParagraph(para.id)}
+                canRemove={paragraphs.length > 1}
+                onSelectionChange={(info) =>
+                  setSelectionInfo(info ? { paraId: para.id, ...info } : null)
+                }
+                onMarkRemove={(markId) => removeMark(para.id, markId)}
+              />
+            ))}
           </div>
-        </main>
-      </div>
 
-      {/* ── Selection toolbar (fixed, above selection) ───────────────── */}
+          {/* + paragraph */}
+          <button
+            onClick={addParagraph}
+            style={{
+              marginTop: "24px",
+              padding: "6px 14px", borderRadius: "8px",
+              border: "1.5px dashed #d4cfc9", background: "transparent",
+              fontSize: "12px", color: "#9c958f", cursor: "pointer",
+              transition: "border-color 0.15s, color 0.15s",
+            }}
+          >
+            + paragraph
+          </button>
+
+          {/* Generate button */}
+          <button
+            onClick={generate}
+            disabled={!canGenerate}
+            style={{
+              width: "100%", padding: "14px", borderRadius: "14px", border: "none",
+              fontSize: "14px", fontWeight: 500, marginTop: "32px",
+              cursor: canGenerate ? "pointer" : "not-allowed",
+              background: canGenerate ? "#2a2622" : "#eae4de",
+              color: canGenerate ? "#f8f6f3" : "#b5aca3",
+              transition: "all 0.15s",
+            }}
+          >
+            {isGenerating ? "Generating…" : isAtLimit ? "Daily limit reached — resets at midnight UTC" : "Generate"}
+          </button>
+
+          {/* Guardrail */}
+          <p style={{ fontSize: "11px", color: "#b5aca3", lineHeight: 1.6, marginTop: "16px" }}>
+            <span style={{ color: "#9c958f" }}>Guardrail · </span>
+            {activeVoice.guardrail}
+          </p>
+
+        </div>
+      </main>
+
+      {/* ── Selection toolbar ────────────────────────────────────────────── */}
       {selectionInfo && (
         <SelectionToolbar
           rectLeft={selectionInfo.rectLeft}
@@ -812,15 +784,15 @@ function Composer() {
         />
       )}
 
-      {/* ── History sidebar ───────────────────────────────────────────── */}
+      {/* ── History drawer (right edge) ───────────────────────────────── */}
       {sidebarOpen && (
         <div
           ref={sidebarRef}
           style={{
-            position: "fixed", top: 0, left: "260px", bottom: 0, width: "300px", zIndex: 100,
-            background: "#ffffff", borderRight: "1px solid #eae4de",
+            position: "fixed", top: 0, right: 0, bottom: 0, width: "320px", zIndex: 100,
+            background: "#ffffff", borderLeft: "1px solid #eae4de",
             display: "flex", flexDirection: "column",
-            boxShadow: "4px 0 24px rgba(42,38,34,0.08)",
+            boxShadow: "-4px 0 24px rgba(42,38,34,0.08)",
           }}
         >
           <div style={{ padding: "16px 20px", borderBottom: "1px solid #eae4de", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -872,7 +844,7 @@ function Composer() {
         </div>
       )}
 
-      {/* ── Fixed player bar ──────────────────────────────────────────── */}
+      {/* ── Fixed player bar ─────────────────────────────────────────────── */}
       {audioUrl && (
         <div style={{
           position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 50,
@@ -910,7 +882,7 @@ function Composer() {
 }
 
 // ---------------------------------------------------------------------------
-// Sub-components
+// Sub-components — unchanged
 // ---------------------------------------------------------------------------
 
 function ActionButton({
@@ -1007,14 +979,12 @@ function ParagraphBlock({
   const editorRef = useRef<HTMLDivElement>(null)
   const isOpen = openPopoverId === para.id
 
-  // Mount only: set initial HTML
   useLayoutEffect(() => {
     if (editorRef.current) {
       editorRef.current.innerHTML = buildMarkedHTML(para.text, para.marks)
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Marks changed: re-render HTML (keyed on marks, NOT text — avoids cursor jump during typing)
   const marksKey = JSON.stringify(para.marks)
   useEffect(() => {
     if (editorRef.current) {
@@ -1072,12 +1042,9 @@ function ParagraphBlock({
             style={{
               position: "absolute",
               bottom: "calc(100% + 6px)",
-              left: 0,
-              zIndex: 200,
-              background: "#ffffff",
-              border: "1px solid #eae4de",
-              borderRadius: "12px",
-              padding: "12px",
+              left: 0, zIndex: 200,
+              background: "#ffffff", border: "1px solid #eae4de",
+              borderRadius: "12px", padding: "12px",
               boxShadow: "0 8px 24px rgba(42,38,34,0.12)",
               display: "flex", flexWrap: "wrap", gap: "6px",
               width: "280px",
@@ -1120,7 +1087,7 @@ function ParagraphBlock({
         }}
       />
 
-      {/* Mark chips (removable) */}
+      {/* Mark chips */}
       {para.marks.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "8px" }}>
           {para.marks.map((mark) => (
