@@ -7,10 +7,7 @@ import { getPlanConfig, remainingGenerations, resolvePlanId, hasPaidPlan } from 
 
 const FRAMER_URL = "https://formal-organization-793965.framer.app"
 
-const INLINE_ACTING_DIRECTIONS = [
-  "Conversational", "Intimate", "Warm", "Urgent", "Reassuring",
-  "Emphasis", "Pause", "Soft", "Confident", "Playful",
-]
+const INLINE_DIRECTIONS = ["Emphasis", "Pause", "Whisper", "Slow"]
 
 // ---------------------------------------------------------------------------
 // Types
@@ -43,7 +40,7 @@ interface Composition {
 }
 
 // ---------------------------------------------------------------------------
-// Pure helpers — unchanged
+// Pure helpers
 // ---------------------------------------------------------------------------
 
 function escapeHtml(str: string): string {
@@ -90,16 +87,16 @@ function getSelectionCharOffsets(el: HTMLElement): { start: number; end: number 
 }
 
 function getDirectionOptions(voiceIntents: string[]): string[] {
-  const extra = INLINE_ACTING_DIRECTIONS.filter((d) => !voiceIntents.includes(d))
+  const extra = INLINE_DIRECTIONS.filter((d) => !voiceIntents.includes(d))
   return [...voiceIntents, ...extra]
 }
 
-function assembleSegments(paragraphs: Paragraph[]): Array<{ text: string; intent: string }> {
+function assembleSegments(paragraphs: Paragraph[], defaultIntent: string): Array<{ text: string; intent: string }> {
   const segments: Array<{ text: string; intent: string }> = []
   for (const para of paragraphs) {
     if (!para.text.trim()) continue
     if (!para.marks.length) {
-      segments.push({ text: para.text, intent: para.direction })
+      segments.push({ text: para.text, intent: defaultIntent })
       continue
     }
     const sorted = [...para.marks].sort((a, b) => a.start - b.start)
@@ -107,7 +104,7 @@ function assembleSegments(paragraphs: Paragraph[]): Array<{ text: string; intent
     for (const mark of sorted) {
       if (mark.start > cursor) {
         const chunk = para.text.slice(cursor, mark.start)
-        if (chunk.trim()) segments.push({ text: chunk, intent: para.direction })
+        if (chunk.trim()) segments.push({ text: chunk, intent: defaultIntent })
       }
       const marked = para.text.slice(mark.start, mark.end)
       if (marked.trim()) segments.push({ text: marked, intent: mark.direction })
@@ -115,7 +112,7 @@ function assembleSegments(paragraphs: Paragraph[]): Array<{ text: string; intent
     }
     if (cursor < para.text.length) {
       const tail = para.text.slice(cursor)
-      if (tail.trim()) segments.push({ text: tail, intent: para.direction })
+      if (tail.trim()) segments.push({ text: tail, intent: defaultIntent })
     }
   }
   return segments
@@ -178,7 +175,6 @@ function Composer() {
   const [paragraphs, setParagraphs] = useState<Paragraph[]>([
     { id: crypto.randomUUID(), text: "", direction: "Conversational", marks: [] },
   ])
-  const [openPopoverId, setOpenPopoverId] = useState<string | null>(null)
 
   // Selection toolbar
   const [selectionInfo, setSelectionInfo] = useState<{
@@ -188,6 +184,14 @@ function Composer() {
     rectWidth: number
     offsets: { start: number; end: number }
   } | null>(null)
+
+  // Voice hover popover
+  const [hoveredVoice, setHoveredVoice] = useState<{
+    voice: VoiceDefinition
+    pillLeft: number
+    pillBottom: number
+  } | null>(null)
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Sample audio preview
   const sampleAudioRef = useRef<HTMLAudioElement | null>(null)
@@ -267,7 +271,7 @@ function Composer() {
   function addParagraph() {
     setParagraphs((prev) => [
       ...prev,
-      { id: crypto.randomUUID(), text: "", direction: directionOptions[0] ?? "Conversational", marks: [] },
+      { id: crypto.randomUUID(), text: "", direction: activeVariant, marks: [] },
     ])
   }
 
@@ -279,11 +283,6 @@ function Composer() {
         return { ...p, text, marks: validMarks }
       })
     )
-  }
-
-  function updateParagraphDirection(id: string, direction: string) {
-    setParagraphs((prev) => prev.map((p) => (p.id === id ? { ...p, direction } : p)))
-    setOpenPopoverId(null)
   }
 
   function removeParagraph(id: string) {
@@ -349,7 +348,7 @@ function Composer() {
           variant: activeVariant,
           script: assembledScript,
           direction: { mode: "inline", intent: activeVariant },
-          segments: assembleSegments(paragraphs),
+          segments: assembleSegments(paragraphs, activeVariant),
         }),
       })
 
@@ -441,7 +440,7 @@ function Composer() {
 
   function handleNewComposition() {
     if (assembledScript.trim() && !confirm("Start a new composition? Your current script will be cleared.")) return
-    setParagraphs([{ id: crypto.randomUUID(), text: "", direction: directionOptions[0] ?? "Conversational", marks: [] }])
+    setParagraphs([{ id: crypto.randomUUID(), text: "", direction: activeVariant, marks: [] }])
     setAudioUrl(null); setAudioBlob(null); setIsPlaying(false)
     setCurrentTime(0); setDuration(0); setGenerationError(null)
   }
@@ -449,16 +448,6 @@ function Composer() {
   // ---------------------------------------------------------------------------
   // Effects
   // ---------------------------------------------------------------------------
-
-  useEffect(() => {
-    if (!openPopoverId) return
-    function onMouseDown(e: MouseEvent) {
-      const popover = document.getElementById(`popover-${openPopoverId}`)
-      if (popover && !popover.contains(e.target as Node)) setOpenPopoverId(null)
-    }
-    document.addEventListener("mousedown", onMouseDown)
-    return () => document.removeEventListener("mousedown", onMouseDown)
-  }, [openPopoverId])
 
   useEffect(() => {
     if (!sidebarOpen) return
@@ -594,13 +583,32 @@ function Composer() {
             height: "100%",
           }}
         >
-          {/* Voice pills */}
+          {/* Eyebrow label */}
+          <span style={{
+            fontSize: "10px", fontWeight: 600, letterSpacing: "0.15em",
+            color: "#b5aca3", textTransform: "uppercase", flexShrink: 0,
+          }}>
+            Performers
+          </span>
+
+          {/* Divider after eyebrow */}
+          <div style={{ width: "1px", height: "20px", background: "#eae4de", flexShrink: 0, margin: "0 2px" }} />
+
+          {/* Voice pills — voice.title, hover opens popover */}
           {voices.map((voice) => {
             const isActive = activeVoice.id === voice.id
             return (
               <button
                 key={voice.id}
                 onClick={() => selectVoice(voice)}
+                onMouseEnter={(e) => {
+                  if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current)
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  setHoveredVoice({ voice, pillLeft: rect.left, pillBottom: rect.bottom })
+                }}
+                onMouseLeave={() => {
+                  hoverTimeoutRef.current = setTimeout(() => setHoveredVoice(null), 150)
+                }}
                 style={{
                   display: "inline-flex", alignItems: "center", gap: "6px",
                   height: "32px", padding: "0 12px",
@@ -618,52 +626,10 @@ function Composer() {
                   background: voice.gradientFrom,
                   opacity: isActive ? 0.7 : 1,
                 }} />
-                {voice.archetype}
+                {voice.title}
               </button>
             )
           })}
-
-          {/* Divider */}
-          <div style={{ width: "1px", height: "20px", background: "#eae4de", flexShrink: 0, margin: "0 2px" }} />
-
-          {/* Variant pills for active voice */}
-          {activeVoice.intents.map((intent) => {
-            const isActive = activeVariant === intent
-            return (
-              <button
-                key={intent}
-                onClick={() => setActiveVariant(intent)}
-                style={{
-                  display: "inline-flex", alignItems: "center",
-                  height: "32px", padding: "0 12px",
-                  borderRadius: "100px",
-                  border: isActive ? "none" : "1px solid #d4cfc9",
-                  background: isActive ? "#2a2622" : "transparent",
-                  color: isActive ? "#f8f6f3" : "#756d65",
-                  fontSize: "12px", fontWeight: isActive ? 500 : 400,
-                  cursor: "pointer", flexShrink: 0,
-                  transition: "all 0.12s",
-                }}
-              >
-                {intent}
-              </button>
-            )
-          })}
-
-          {/* Sample play button */}
-          <button
-            onClick={() => toggleSamplePlay(activeVoice)}
-            title={`Preview ${activeVoice.archetype}`}
-            style={{
-              width: "28px", height: "28px", borderRadius: "50%",
-              border: "1px solid #d4cfc9", background: "transparent",
-              color: "#756d65", cursor: "pointer", flexShrink: 0,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "11px", transition: "all 0.12s",
-            }}
-          >
-            {playingSampleId === activeVoice.id ? "⏸" : "▶"}
-          </button>
         </div>
       </div>
 
@@ -718,11 +684,7 @@ function Composer() {
               <ParagraphBlock
                 key={para.id}
                 para={para}
-                openPopoverId={openPopoverId}
-                directionOptions={directionOptions}
                 onTextChange={(text) => updateParagraphText(para.id, text)}
-                onDirectionChange={(dir) => updateParagraphDirection(para.id, dir)}
-                onOpenPopover={() => setOpenPopoverId(para.id)}
                 onRemove={() => removeParagraph(para.id)}
                 canRemove={paragraphs.length > 1}
                 onSelectionChange={(info) =>
@@ -771,6 +733,80 @@ function Composer() {
 
         </div>
       </main>
+
+      {/* ── Voice hover popover (fixed, avoids toolbar overflow clip) ────── */}
+      {hoveredVoice && (
+        <div
+          onMouseEnter={() => {
+            if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current)
+          }}
+          onMouseLeave={() => {
+            hoverTimeoutRef.current = setTimeout(() => setHoveredVoice(null), 150)
+          }}
+          style={{
+            position: "fixed",
+            left: hoveredVoice.pillLeft,
+            top: hoveredVoice.pillBottom + 8,
+            zIndex: 200,
+            width: "220px",
+            background: "#ffffff",
+            border: "1px solid #eae4de",
+            borderRadius: "12px",
+            padding: "16px",
+            boxShadow: "0 8px 24px rgba(42,38,34,0.1)",
+          }}
+        >
+          <p style={{ fontSize: "13px", fontWeight: 600, color: "#2a2622", margin: "0 0 2px" }}>
+            {hoveredVoice.voice.title}
+          </p>
+          <p style={{ fontSize: "11px", color: "#9c958f", margin: "0 0 8px" }}>
+            {hoveredVoice.voice.archetype}
+          </p>
+          <p style={{ fontSize: "12px", color: "#756d65", lineHeight: 1.5, margin: "0 0 12px" }}>
+            {hoveredVoice.voice.blurb}
+          </p>
+
+          {/* Variant pills */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "12px" }}>
+            {hoveredVoice.voice.intents.map((intent) => {
+              const isActiveIntent = hoveredVoice.voice.id === activeVoice.id && activeVariant === intent
+              return (
+                <button
+                  key={intent}
+                  onClick={() => {
+                    selectVoice(hoveredVoice.voice)
+                    setActiveVariant(intent)
+                    setHoveredVoice(null)
+                  }}
+                  style={{
+                    padding: "3px 10px", borderRadius: "100px",
+                    border: isActiveIntent ? "none" : "1px solid #d4cfc9",
+                    background: isActiveIntent ? "#2a2622" : "transparent",
+                    color: isActiveIntent ? "#f8f6f3" : "#756d65",
+                    fontSize: "11px", fontWeight: isActiveIntent ? 500 : 400,
+                    cursor: "pointer", transition: "all 0.12s",
+                  }}
+                >
+                  {intent}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Sample play button */}
+          <button
+            onClick={() => toggleSamplePlay(hoveredVoice.voice)}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: "6px",
+              padding: "5px 10px", borderRadius: "8px",
+              border: "1px solid #d4cfc9", background: "transparent",
+              fontSize: "11px", color: "#756d65", cursor: "pointer",
+            }}
+          >
+            {playingSampleId === hoveredVoice.voice.id ? "⏸ Stop" : "▶ Play sample"}
+          </button>
+        </div>
+      )}
 
       {/* ── Selection toolbar ────────────────────────────────────────────── */}
       {selectionInfo && (
@@ -882,7 +918,7 @@ function Composer() {
 }
 
 // ---------------------------------------------------------------------------
-// Sub-components — unchanged
+// Sub-components
 // ---------------------------------------------------------------------------
 
 function ActionButton({
@@ -900,12 +936,12 @@ function ActionButton({
       title={title}
       className="lyric-action-btn"
       style={{
-        width: "32px", height: "32px", borderRadius: "8px",
+        width: "36px", height: "36px", borderRadius: "8px",
         border: "none", background: "transparent",
         color: disabled ? "#d4cfc9" : "#756d65",
         cursor: disabled ? "not-allowed" : "pointer",
         display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: "15px", transition: "background 0.12s",
+        fontSize: "20px", transition: "background 0.12s",
       }}
     >
       {children}
@@ -961,23 +997,18 @@ function SelectionToolbar({
 }
 
 function ParagraphBlock({
-  para, openPopoverId, directionOptions,
-  onTextChange, onDirectionChange, onOpenPopover,
-  onRemove, canRemove, onSelectionChange, onMarkRemove,
+  para,
+  onTextChange, onRemove, canRemove,
+  onSelectionChange, onMarkRemove,
 }: {
   para: Paragraph
-  openPopoverId: string | null
-  directionOptions: string[]
   onTextChange: (text: string) => void
-  onDirectionChange: (direction: string) => void
-  onOpenPopover: () => void
   onRemove: () => void
   canRemove: boolean
   onSelectionChange: (info: { rectLeft: number; rectTop: number; rectWidth: number; offsets: { start: number; end: number } } | null) => void
   onMarkRemove: (markId: string) => void
 }) {
   const editorRef = useRef<HTMLDivElement>(null)
-  const isOpen = openPopoverId === para.id
 
   useLayoutEffect(() => {
     if (editorRef.current) {
@@ -1010,65 +1041,20 @@ function ParagraphBlock({
 
   return (
     <div style={{ position: "relative" }}>
-
-      {/* Direction chip row */}
-      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px", position: "relative" }}>
+      {canRemove && (
         <button
-          onClick={onOpenPopover}
+          onClick={onRemove}
+          title="Remove paragraph"
           style={{
-            display: "inline-flex", alignItems: "center", gap: "4px",
-            padding: "3px 8px", borderRadius: "100px",
-            background: "#f0ebe6", border: "none",
-            fontSize: "12px", color: "#8a7d74", cursor: "pointer",
+            position: "absolute", top: 0, right: 0,
+            width: "18px", height: "18px", borderRadius: "50%", border: "none",
+            background: "transparent", color: "#d4cfc9", cursor: "pointer",
+            fontSize: "14px", display: "flex", alignItems: "center", justifyContent: "center",
           }}
         >
-          <span style={{ fontSize: "10px" }}>✏</span>
-          {para.direction}
+          ×
         </button>
-        {canRemove && (
-          <button
-            onClick={onRemove}
-            title="Remove paragraph"
-            style={{ width: "18px", height: "18px", borderRadius: "50%", border: "none", background: "transparent", color: "#d4cfc9", cursor: "pointer", fontSize: "14px", display: "flex", alignItems: "center", justifyContent: "center" }}
-          >
-            ×
-          </button>
-        )}
-
-        {/* Popover — opens ABOVE chip */}
-        {isOpen && (
-          <div
-            id={`popover-${para.id}`}
-            style={{
-              position: "absolute",
-              bottom: "calc(100% + 6px)",
-              left: 0, zIndex: 200,
-              background: "#ffffff", border: "1px solid #eae4de",
-              borderRadius: "12px", padding: "12px",
-              boxShadow: "0 8px 24px rgba(42,38,34,0.12)",
-              display: "flex", flexWrap: "wrap", gap: "6px",
-              width: "280px",
-            }}
-          >
-            {directionOptions.map((dir) => (
-              <button
-                key={dir}
-                onClick={() => onDirectionChange(dir)}
-                style={{
-                  padding: "4px 10px", borderRadius: "100px",
-                  border: `1.5px solid ${para.direction === dir ? "#2a2622" : "#d4cfc9"}`,
-                  fontSize: "11px", fontWeight: 500, cursor: "pointer",
-                  background: para.direction === dir ? "#2a2622" : "transparent",
-                  color: para.direction === dir ? "#f8f6f3" : "#756d65",
-                  transition: "all 0.1s",
-                }}
-              >
-                {dir}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Contenteditable body */}
       <div
@@ -1104,9 +1090,7 @@ function ParagraphBlock({
               <button
                 onClick={() => onMarkRemove(mark.id)}
                 style={{ background: "none", border: "none", cursor: "pointer", color: "#c4977f", fontSize: "11px", lineHeight: 1, padding: 0 }}
-              >
-                ×
-              </button>
+              >×</button>
             </span>
           ))}
         </div>
