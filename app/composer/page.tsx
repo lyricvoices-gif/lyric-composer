@@ -69,7 +69,7 @@ function NoPlanWall() {
           Lyric Composer is available on Creator, Studio, and Enterprise plans.
         </p>
         <a
-          href={FRAMER_URL}
+          href="/upgrade"
           style={{ marginTop: "8px", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "10px 24px", borderRadius: "12px", background: "#2a2622", color: "#f8f6f3", fontSize: "14px", fontWeight: 500, textDecoration: "none" }}
         >
           View plans
