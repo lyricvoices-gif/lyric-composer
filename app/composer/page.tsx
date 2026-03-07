@@ -4,6 +4,7 @@ import { SignedIn, SignedOut, UserButton, useAuth } from "@clerk/nextjs"
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react"
 import { getAllVoices, VoiceDefinition } from "@/lib/voiceData"
 import { getPlanConfig, remainingGenerations, resolvePlanId, hasPaidPlan } from "@/lib/planConfig"
+import { Plus, Download, RotateCcw, Clock, X } from "lucide-react"
 
 const FRAMER_URL = "https://formal-organization-793965.framer.app"
 
@@ -219,15 +220,14 @@ function Composer() {
   const [loadingCompositions, setLoadingCompositions] = useState(false)
   const sidebarRef = useRef<HTMLDivElement>(null)
 
-  // Change 3 + 6: refs for generate button and script area
-  const generateBtnRef = useRef<HTMLButtonElement>(null)
-  const scriptAreaRef = useRef<HTMLDivElement>(null)
-
-  // Change 6: FTU tooltip state
-  const [ftuScriptVisible, setFtuScriptVisible] = useState(false)
-  const [ftuHighlightVisible, setFtuHighlightVisible] = useState(false)
-  const [ftuGenerateVisible, setFtuGenerateVisible] = useState(false)
+  // FTU state
+  const [ftuScript, setFtuScript] = useState(false)
+  const [ftuHighlight, setFtuHighlight] = useState(false)
+  const [ftuGenerate, setFtuGenerate] = useState(false)
   const ftuHighlightFired = useRef(false)
+  const ftuGenerateFired = useRef(false)
+  const scriptAreaRef = useRef<HTMLDivElement>(null)
+  const generateBtnRef = useRef<HTMLButtonElement>(null)
 
   // ---------------------------------------------------------------------------
   // Plan
@@ -518,39 +518,39 @@ function Composer() {
     return () => document.removeEventListener("mousedown", onMouseDown)
   }, [hoveredVoice])
 
-  // Change 6: FTU — script tooltip on mount
+  // FTU 1 — script tooltip, 1.2s after mount
   useEffect(() => {
-    if (!localStorage.getItem("lyric_ftu_script")) {
-      setFtuScriptVisible(true)
-    }
+    if (localStorage.getItem("lyric_ftu_script")) return
+    const t = setTimeout(() => setFtuScript(true), 1200)
+    return () => clearTimeout(t)
   }, [])
 
-  // FTU — highlight tooltip after 20 chars typed
+  // FTU 2 — highlight tooltip, after 20 chars typed
   useEffect(() => {
     if (localStorage.getItem("lyric_ftu_highlight")) return
-    if (assembledScript.length < 20) return
-    if (ftuHighlightFired.current) return
+    if (assembledScript.length < 20 || ftuHighlightFired.current) return
     ftuHighlightFired.current = true
-    const t = setTimeout(() => setFtuHighlightVisible(true), 800)
+    const t = setTimeout(() => setFtuHighlight(true), 800)
     return () => clearTimeout(t)
   }, [assembledScript.length])
 
-  function handleFtu1Dismiss() {
+  function dismissFtu1() {
     localStorage.setItem("lyric_ftu_script", "1")
-    setFtuScriptVisible(false)
+    setFtuScript(false)
   }
 
-  function handleFtu2Dismiss() {
+  function dismissFtu2() {
     localStorage.setItem("lyric_ftu_highlight", "1")
-    setFtuHighlightVisible(false)
-    if (!localStorage.getItem("lyric_ftu_generate") && usedToday === 0) {
-      setTimeout(() => setFtuGenerateVisible(true), 1000)
+    setFtuHighlight(false)
+    if (!localStorage.getItem("lyric_ftu_generate") && !ftuGenerateFired.current) {
+      ftuGenerateFired.current = true
+      setTimeout(() => setFtuGenerate(true), 1000)
     }
   }
 
-  function handleFtu3Dismiss() {
+  function dismissFtu3() {
     localStorage.setItem("lyric_ftu_generate", "1")
-    setFtuGenerateVisible(false)
+    setFtuGenerate(false)
   }
 
   // ---------------------------------------------------------------------------
@@ -596,9 +596,8 @@ function Composer() {
         .lyric-scrubber::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #faf9f7; cursor: pointer; }
         .lyric-scrubber::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #faf9f7; border: none; cursor: pointer; }
         @keyframes lyric-progress {
-          0% { left: -40%; }
-          60% { left: 100%; }
-          100% { left: 100%; }
+          0% { transform: translateX(-150%); }
+          100% { transform: translateX(400%); }
         }
         @keyframes lyric-ftu-in {
           from { opacity: 0; transform: translateY(4px); }
@@ -713,22 +712,22 @@ function Composer() {
 
           {/* Action bar */}
           <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "24px" }}>
-            <ActionButton title="New composition" onClick={handleNewComposition}>✦</ActionButton>
+            <ActionButton title="New composition" onClick={handleNewComposition}><Plus size={20} strokeWidth={1.5} /></ActionButton>
             <ActionButton
               title={audioBlob ? "Download" : "Generate audio to download"}
               onClick={handleDownload}
               disabled={!audioBlob}
             >
-              ↓
+              <Download size={20} strokeWidth={1.5} />
             </ActionButton>
             <ActionButton
               title={canGenerate ? "Regenerate" : isAtLimit ? "Daily limit reached" : "Write a script to generate"}
               onClick={generate}
               disabled={!canGenerate}
             >
-              <span style={{ fontSize: "14px", lineHeight: 1 }}>↺</span>
+              <RotateCcw size={20} strokeWidth={1.5} />
             </ActionButton>
-            <ActionButton title="History" onClick={openSidebar}>◷</ActionButton>
+            <ActionButton title="History" onClick={openSidebar}><Clock size={20} strokeWidth={1.5} /></ActionButton>
             <div style={{ flex: 1 }} />
             <span style={{ fontSize: "11px", fontVariantNumeric: "tabular-nums", color: isOverScriptLimit ? "#c4722a" : "#b5aca3" }}>
               {assembledScript.length} / {plan.maxScriptCharacters}
@@ -752,10 +751,12 @@ function Composer() {
             </p>
           )}
 
-          {/* Change 6: FTU — script tooltip */}
-          <FTUTooltip visible={ftuScriptVisible} onDismiss={handleFtu1Dismiss}>
-            Click to start writing your script below
-          </FTUTooltip>
+          <FTUTooltip
+            message="Write your script here. Highlight any phrase to shape how it's delivered."
+            visible={ftuScript}
+            anchorRef={scriptAreaRef}
+            onDismiss={dismissFtu1}
+          />
 
           {/* Paragraph blocks */}
           <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
@@ -774,10 +775,12 @@ function Composer() {
             ))}
           </div>
 
-          {/* Change 6: FTU — highlight tooltip */}
-          <FTUTooltip visible={ftuHighlightVisible} onDismiss={handleFtu2Dismiss}>
-            Highlight any word or phrase to add a direction mark
-          </FTUTooltip>
+          <FTUTooltip
+            message="Select a word or phrase to apply emotional direction."
+            visible={ftuHighlight}
+            anchorRef={scriptAreaRef}
+            onDismiss={dismissFtu2}
+          />
 
           {/* + paragraph */}
           <button
@@ -793,7 +796,7 @@ function Composer() {
             + paragraph
           </button>
 
-          {/* Change 3: Generate button with progress bar */}
+          {/* Generate button */}
           <button
             ref={generateBtnRef}
             onClick={generate}
@@ -802,24 +805,27 @@ function Composer() {
               width: "100%", padding: "14px", borderRadius: "14px", border: "none",
               fontSize: "14px", fontWeight: 500, marginTop: "32px",
               cursor: canGenerate ? "pointer" : "not-allowed",
-              background: canGenerate ? "#2a2622" : "#eae4de",
-              color: canGenerate ? "#faf9f7" : "#b5aca3",
-              transition: "all 0.15s",
-              position: "relative", overflow: "hidden",
+              background: canGenerate || isGenerating ? "#2a2622" : "#eae4de",
+              color: canGenerate || isGenerating ? "#faf9f7" : "#b5aca3",
+              transition: "background 0.15s",
             }}
           >
             {isGenerating ? "Generating…" : isAtLimit ? "Daily limit reached — resets at midnight UTC" : "Generate"}
-            {isGenerating && (
-              <span style={{ position: "absolute", bottom: 0, left: 0, width: "100%", height: "3px", background: "rgba(248,246,243,0.15)", borderRadius: "0 0 14px 14px", overflow: "hidden" }}>
-                <span style={{ position: "absolute", top: 0, left: 0, width: "40%", height: "100%", background: "rgba(248,246,243,0.5)", borderRadius: "2px", animation: "lyric-progress 1.4s ease-in-out infinite" }} />
-              </span>
-            )}
           </button>
 
-          {/* Change 6: FTU — generate tooltip */}
-          <FTUTooltip visible={ftuGenerateVisible} onDismiss={handleFtu3Dismiss}>
-            Hit Generate to hear your script performed
-          </FTUTooltip>
+          {/* Generation progress bar */}
+          {isGenerating && (
+            <div style={{ width: "100%", height: "3px", background: "#eae4de", borderRadius: "100px", marginTop: "8px", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: "40%", background: "linear-gradient(90deg, transparent, #c4977f, transparent)", borderRadius: "100px", animation: "lyric-progress 1.6s ease-in-out infinite" }} />
+            </div>
+          )}
+
+          <FTUTooltip
+            message="When you're ready, generate to hear your script voiced."
+            visible={ftuGenerate}
+            anchorRef={generateBtnRef}
+            onDismiss={dismissFtu3}
+          />
 
         </div>
       </main>
@@ -923,7 +929,7 @@ function Composer() {
         >
           <div style={{ padding: "16px 20px", borderBottom: "1px solid #eae4de", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <p style={{ fontSize: "12px", fontWeight: 600, color: "#2a2622", margin: 0 }}>History</p>
-            <button onClick={() => setSidebarOpen(false)} style={{ background: "none", border: "none", color: "#9c958f", cursor: "pointer", fontSize: "18px", lineHeight: 1, padding: "0 2px" }}>×</button>
+            <button onClick={() => setSidebarOpen(false)} style={{ background: "none", border: "none", color: "#9c958f", cursor: "pointer", padding: "0 2px", display: "flex" }}><X size={16} strokeWidth={1.5} /></button>
           </div>
           <div style={{ flex: 1, overflowY: "auto", padding: "12px" }}>
             {loadingCompositions ? (
@@ -1024,8 +1030,8 @@ function Composer() {
           </span>
 
           {/* Inverted action buttons */}
-          <ActionButton inverted title="Download" onClick={handleDownload}>↓</ActionButton>
-          <ActionButton inverted title={canGenerate ? "Regenerate" : "Cannot regenerate now"} onClick={generate} disabled={!canGenerate}><span style={{ fontSize: "14px", lineHeight: 1 }}>↺</span></ActionButton>
+          <ActionButton inverted title="Download" onClick={handleDownload}><Download size={20} strokeWidth={1.5} /></ActionButton>
+          <ActionButton inverted title={canGenerate ? "Regenerate" : "Cannot regenerate now"} onClick={generate} disabled={!canGenerate}><RotateCcw size={20} strokeWidth={1.5} /></ActionButton>
         </div>
       )}
     </div>
@@ -1052,14 +1058,14 @@ function ActionButton({
       title={title}
       className={inverted ? "lyric-action-btn-inv" : "lyric-action-btn"}
       style={{
-        width: "36px", height: "36px", borderRadius: "8px",
+        width: "40px", height: "40px", borderRadius: "8px",
         border: "none", background: "transparent",
-        color: inverted
-          ? (disabled ? "rgba(248,246,243,0.25)" : "rgba(248,246,243,0.6)")
-          : (disabled ? "#d4cfc9" : "#756d65"),
+        color: disabled
+          ? (inverted ? "rgba(248,246,243,0.3)" : "#d4cfc9")
+          : (inverted ? "rgba(248,246,243,0.6)" : "#756d65"),
         cursor: disabled ? "not-allowed" : "pointer",
         display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: "16px", lineHeight: 1, transition: "background 0.12s",
+        transition: "background 0.12s",
       }}
     >
       {children}
@@ -1068,28 +1074,59 @@ function ActionButton({
 }
 
 function FTUTooltip({
-  visible, onDismiss, children,
+  message, visible, anchorRef, onDismiss,
 }: {
+  message: string
   visible: boolean
+  anchorRef: { current: HTMLElement | null }
   onDismiss: () => void
-  children: React.ReactNode
 }) {
-  if (!visible) return null
+  const [phase, setPhase] = useState<"hidden" | "in" | "visible" | "out">("hidden")
+  const [pos, setPos] = useState({ left: 0, top: 0 })
+
+  useEffect(() => {
+    if (!visible) { setPhase("hidden"); return }
+    if (anchorRef.current) {
+      const rect = anchorRef.current.getBoundingClientRect()
+      setPos({ left: rect.left + rect.width / 2, top: rect.top })
+    }
+    setPhase("in")
+    const visTimer = setTimeout(() => setPhase("visible"), 400)
+    const outTimer = setTimeout(() => setPhase("out"), 4000)
+    const doneTimer = setTimeout(() => { setPhase("hidden"); onDismiss() }, 4400)
+    return () => { clearTimeout(visTimer); clearTimeout(outTimer); clearTimeout(doneTimer) }
+  }, [visible]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (phase === "hidden") return null
+
   return (
-    <div style={{ animation: "lyric-ftu-in 0.25s ease forwards", margin: "12px 0", borderRadius: "6px", overflow: "hidden", pointerEvents: "none" }}>
-      <div style={{ height: "2px", background: "linear-gradient(90deg, #c4977f, transparent)" }} />
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 0" }}>
-        <p style={{ fontSize: "12px", color: "#9c958f", lineHeight: 1.5, margin: 0, flex: 1 }}>
-          <span style={{ fontSize: "10px", color: "#c4977f", marginRight: "6px", verticalAlign: "middle" }}>✦</span>
-          {children}
-        </p>
-        <button
-          onClick={onDismiss}
-          style={{ pointerEvents: "all", background: "none", border: "none", color: "#b5aca3", cursor: "pointer", fontSize: "14px", lineHeight: 1, padding: "0 2px", flexShrink: 0 }}
-        >
-          ×
-        </button>
-      </div>
+    <div
+      style={{
+        position: "fixed",
+        left: pos.left,
+        top: pos.top - 16,
+        zIndex: 400,
+        width: "240px",
+        background: "rgba(42,38,34,0.92)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: "12px",
+        padding: "14px 16px",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+        pointerEvents: "none",
+        opacity: phase === "out" ? 0 : 1,
+        transform: phase === "in" ? "translate(-50%, calc(-100% + 6px))" : "translate(-50%, -100%)",
+        transition: phase === "in"
+          ? "opacity 0.4s cubic-bezier(0.16,1,0.3,1), transform 0.4s cubic-bezier(0.16,1,0.3,1)"
+          : phase === "out" ? "opacity 0.3s ease" : "none",
+      }}
+    >
+      <div style={{ position: "absolute", top: 0, left: "16px", right: "16px", height: "2px", background: "linear-gradient(90deg, #c4977f, transparent)", borderRadius: "2px 2px 0 0" }} />
+      <p style={{ fontSize: "12px", color: "rgba(248,246,243,0.88)", lineHeight: 1.65, margin: 0, paddingTop: "4px" }}>
+        {message}
+      </p>
+      <div style={{ position: "absolute", bottom: "-7px", left: "50%", transform: "translateX(-50%)", width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: "7px solid rgba(42,38,34,0.92)" }} />
     </div>
   )
 }
