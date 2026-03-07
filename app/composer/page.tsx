@@ -139,14 +139,14 @@ function FramerRedirect() {
 
 function NoPlanWall() {
   return (
-    <div style={{ minHeight: "100vh", background: "#f8f6f3", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px" }}>
+    <div style={{ minHeight: "100vh", background: "#faf9f7", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px" }}>
       <p style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.2em", color: "#b5aca3", textTransform: "uppercase", marginBottom: "40px" }}>Lyric</p>
       <div style={{ maxWidth: "320px", textAlign: "center", display: "flex", flexDirection: "column", gap: "16px" }}>
         <h1 style={{ fontSize: "18px", fontWeight: 600, letterSpacing: "-0.02em", color: "#2a2622" }}>Composer requires a plan</h1>
         <p style={{ fontSize: "14px", color: "#756d65", lineHeight: 1.6 }}>
           Lyric Composer is available on Creator, Studio, and Enterprise plans.
         </p>
-        <a href="/upgrade" style={{ marginTop: "8px", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "10px 24px", borderRadius: "12px", background: "#2a2622", color: "#f8f6f3", fontSize: "14px", fontWeight: 500, textDecoration: "none" }}>
+        <a href="/upgrade" style={{ marginTop: "8px", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "10px 24px", borderRadius: "12px", background: "#2a2622", color: "#faf9f7", fontSize: "14px", fontWeight: 500, textDecoration: "none" }}>
           View plans
         </a>
         <p style={{ fontSize: "12px", color: "#b5aca3", marginTop: "8px" }}>
@@ -525,15 +525,15 @@ function Composer() {
     }
   }, [])
 
-  // Change 6: FTU — highlight tooltip on first text entry
+  // FTU — highlight tooltip after 20 chars typed
   useEffect(() => {
+    if (localStorage.getItem("lyric_ftu_highlight")) return
+    if (assembledScript.length < 20) return
     if (ftuHighlightFired.current) return
-    if (!localStorage.getItem("lyric_ftu_highlight") && assembledScript.length > 0) {
-      ftuHighlightFired.current = true
-      setFtuScriptVisible(false)
-      setFtuHighlightVisible(true)
-    }
-  }, [assembledScript])
+    ftuHighlightFired.current = true
+    const t = setTimeout(() => setFtuHighlightVisible(true), 800)
+    return () => clearTimeout(t)
+  }, [assembledScript.length])
 
   function handleFtu1Dismiss() {
     localStorage.setItem("lyric_ftu_script", "1")
@@ -571,10 +571,10 @@ function Composer() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f8f6f3", display: "flex", flexDirection: "column", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#faf9f7", display: "flex", flexDirection: "column", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
 
       <style>{`
-        html, body { background: #f8f6f3 !important; margin: 0; }
+        html, body { background: #faf9f7 !important; margin: 0; }
         [data-mark-direction]::after {
           content: attr(data-mark-direction);
           display: inline-block; font-size: 9px;
@@ -593,8 +593,8 @@ function Composer() {
         .lyric-toolbar-row { scrollbar-width: none; }
         .lyric-toolbar-row::-webkit-scrollbar { display: none; }
         .lyric-scrubber { -webkit-appearance: none; appearance: none; height: 3px; border-radius: 2px; background: rgba(248,246,243,0.2); outline: none; cursor: pointer; }
-        .lyric-scrubber::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #f8f6f3; cursor: pointer; }
-        .lyric-scrubber::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #f8f6f3; border: none; cursor: pointer; }
+        .lyric-scrubber::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #faf9f7; cursor: pointer; }
+        .lyric-scrubber::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #faf9f7; border: none; cursor: pointer; }
         @keyframes lyric-progress {
           0% { left: -40%; }
           60% { left: 100%; }
@@ -689,7 +689,7 @@ function Composer() {
                   borderRadius: "100px",
                   border: isActive ? "none" : "1px solid #d4cfc9",
                   background: isActive ? "#2a2622" : "transparent",
-                  color: isActive ? "#f8f6f3" : "#756d65",
+                  color: isActive ? "#faf9f7" : "#756d65",
                   fontSize: "12px", fontWeight: isActive ? 500 : 400,
                   cursor: "pointer", flexShrink: 0,
                   transition: "all 0.12s",
@@ -726,7 +726,7 @@ function Composer() {
               onClick={generate}
               disabled={!canGenerate}
             >
-              ↺
+              <span style={{ fontSize: "14px", lineHeight: 1 }}>↺</span>
             </ActionButton>
             <ActionButton title="History" onClick={openSidebar}>◷</ActionButton>
             <div style={{ flex: 1 }} />
@@ -803,7 +803,7 @@ function Composer() {
               fontSize: "14px", fontWeight: 500, marginTop: "32px",
               cursor: canGenerate ? "pointer" : "not-allowed",
               background: canGenerate ? "#2a2622" : "#eae4de",
-              color: canGenerate ? "#f8f6f3" : "#b5aca3",
+              color: canGenerate ? "#faf9f7" : "#b5aca3",
               transition: "all 0.15s",
               position: "relative", overflow: "hidden",
             }}
@@ -820,12 +820,6 @@ function Composer() {
           <FTUTooltip visible={ftuGenerateVisible} onDismiss={handleFtu3Dismiss}>
             Hit Generate to hear your script performed
           </FTUTooltip>
-
-          {/* Guardrail */}
-          <p style={{ fontSize: "11px", color: "#b5aca3", lineHeight: 1.6, marginTop: "16px" }}>
-            <span style={{ color: "#9c958f" }}>Guardrail · </span>
-            {activeVoice.guardrail}
-          </p>
 
         </div>
       </main>
@@ -878,7 +872,7 @@ function Composer() {
                     padding: "3px 10px", borderRadius: "100px",
                     border: isActiveIntent ? "none" : "1px solid #d4cfc9",
                     background: isActiveIntent ? "#2a2622" : "transparent",
-                    color: isActiveIntent ? "#f8f6f3" : "#756d65",
+                    color: isActiveIntent ? "#faf9f7" : "#756d65",
                     fontSize: "11px", fontWeight: isActiveIntent ? 500 : 400,
                     cursor: "pointer", transition: "all 0.12s",
                   }}
@@ -982,7 +976,7 @@ function Composer() {
           position: "fixed", bottom: "24px", left: "50%", transform: "translateX(-50%)",
           zIndex: 50, width: "480px", maxWidth: "calc(100vw - 48px)",
           background: "#2a2622", borderRadius: "100px",
-          padding: "10px 16px",
+          padding: "10px 24px",
           display: "flex", alignItems: "center", gap: "12px",
           boxShadow: "0 8px 32px rgba(42,38,34,0.28)",
         }}>
@@ -1002,7 +996,7 @@ function Composer() {
             onClick={togglePlay}
             style={{
               width: "28px", height: "28px", borderRadius: "50%",
-              background: "rgba(248,246,243,0.12)", color: "#f8f6f3",
+              background: "rgba(248,246,243,0.12)", color: "#faf9f7",
               border: "none", display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: "11px", cursor: "pointer", flexShrink: 0,
               transition: "background 0.12s",
@@ -1031,7 +1025,7 @@ function Composer() {
 
           {/* Inverted action buttons */}
           <ActionButton inverted title="Download" onClick={handleDownload}>↓</ActionButton>
-          <ActionButton inverted title={canGenerate ? "Regenerate" : "Cannot regenerate now"} onClick={generate} disabled={!canGenerate}>↺</ActionButton>
+          <ActionButton inverted title={canGenerate ? "Regenerate" : "Cannot regenerate now"} onClick={generate} disabled={!canGenerate}><span style={{ fontSize: "14px", lineHeight: 1 }}>↺</span></ActionButton>
         </div>
       )}
     </div>
@@ -1065,7 +1059,7 @@ function ActionButton({
           : (disabled ? "#d4cfc9" : "#756d65"),
         cursor: disabled ? "not-allowed" : "pointer",
         display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: "20px", transition: "background 0.12s",
+        fontSize: "16px", lineHeight: 1, transition: "background 0.12s",
       }}
     >
       {children}
@@ -1082,28 +1076,20 @@ function FTUTooltip({
 }) {
   if (!visible) return null
   return (
-    <div
-      style={{
-        pointerEvents: "none",
-        animation: "lyric-ftu-in 0.25s ease forwards",
-        margin: "12px 0",
-        display: "flex", alignItems: "flex-start", gap: "10px",
-      }}
-    >
-      <div style={{ width: "2px", borderRadius: "2px", background: "#c4977f", alignSelf: "stretch", flexShrink: 0 }} />
-      <div style={{ flex: 1 }}>
-        <p style={{ fontSize: "12px", color: "#9c958f", lineHeight: 1.5, margin: 0 }}>{children}</p>
+    <div style={{ animation: "lyric-ftu-in 0.25s ease forwards", margin: "12px 0", borderRadius: "6px", overflow: "hidden", pointerEvents: "none" }}>
+      <div style={{ height: "2px", background: "linear-gradient(90deg, #c4977f, transparent)" }} />
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 0" }}>
+        <p style={{ fontSize: "12px", color: "#9c958f", lineHeight: 1.5, margin: 0, flex: 1 }}>
+          <span style={{ fontSize: "10px", color: "#c4977f", marginRight: "6px", verticalAlign: "middle" }}>✦</span>
+          {children}
+        </p>
+        <button
+          onClick={onDismiss}
+          style={{ pointerEvents: "all", background: "none", border: "none", color: "#b5aca3", cursor: "pointer", fontSize: "14px", lineHeight: 1, padding: "0 2px", flexShrink: 0 }}
+        >
+          ×
+        </button>
       </div>
-      <button
-        onClick={onDismiss}
-        style={{
-          pointerEvents: "all",
-          background: "none", border: "none", color: "#b5aca3",
-          cursor: "pointer", fontSize: "14px", lineHeight: 1, padding: "0 2px", flexShrink: 0,
-        }}
-      >
-        ×
-      </button>
     </div>
   )
 }
@@ -1144,7 +1130,7 @@ function SelectionToolbar({
             padding: "3px 9px", borderRadius: "100px",
             border: `1px solid ${dir === currentDirection ? "#c4977f" : "rgba(255,255,255,0.18)"}`,
             background: dir === currentDirection ? "rgba(196,151,127,0.28)" : "transparent",
-            color: "#f8f6f3", fontSize: "11px", fontWeight: 500,
+            color: "#faf9f7", fontSize: "11px", fontWeight: 500,
             cursor: "pointer", whiteSpace: "nowrap",
           }}
         >
