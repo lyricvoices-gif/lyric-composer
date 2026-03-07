@@ -60,7 +60,7 @@ function buildMarkedHTML(text: string, marks: InlineMark[]): string {
   let cursor = 0
   for (const mark of sorted) {
     if (mark.start > cursor) result += escapeHtml(text.slice(cursor, mark.start))
-    result += `<span data-mark-id="${mark.id}" data-mark-direction="${mark.direction}" style="background:rgba(196,151,127,0.15);border-radius:3px;padding:1px 0;">${escapeHtml(text.slice(mark.start, mark.end))}</span>`
+    result += `<span data-mark-id="${mark.id}" data-mark-direction="${mark.direction}" style="background:rgba(184,149,90,0.15);border-radius:3px;padding:1px 0;">${escapeHtml(text.slice(mark.start, mark.end))}</span>`
     cursor = mark.end
   }
   if (cursor < text.length) result += escapeHtml(text.slice(cursor))
@@ -228,6 +228,7 @@ function Composer() {
   const ftuGenerateFired = useRef(false)
   const scriptAreaRef = useRef<HTMLDivElement>(null)
   const generateBtnRef = useRef<HTMLButtonElement>(null)
+  const [ftuScriptPos, setFtuScriptPos] = useState({ left: 0, top: 0 })
 
   // ---------------------------------------------------------------------------
   // Plan
@@ -525,6 +526,16 @@ function Composer() {
     return () => clearTimeout(t)
   }, [])
 
+  // FTU 1 — track position of first paragraph for fixed tooltip
+  useEffect(() => {
+    if (!ftuScript) return
+    const el = document.querySelector('[data-first-para="true"]')
+    if (el) {
+      const rect = el.getBoundingClientRect()
+      setFtuScriptPos({ left: rect.left, top: rect.top + rect.height / 2 })
+    }
+  }, [ftuScript])
+
   // FTU 1 — auto-dismiss when user starts typing
   useEffect(() => {
     if (assembledScript.length > 0 && ftuScript) {
@@ -534,12 +545,13 @@ function Composer() {
 
   // FTU 2 — highlight tooltip, after 20 chars typed
   useEffect(() => {
+    if (ftuScript) return
     if (localStorage.getItem("lyric_ftu_highlight")) return
     if (assembledScript.length < 20 || ftuHighlightFired.current) return
     ftuHighlightFired.current = true
     const t = setTimeout(() => setFtuHighlight(true), 800)
     return () => clearTimeout(t)
-  }, [assembledScript.length])
+  }, [assembledScript.length, ftuScript])
 
   function dismissFtu1() {
     localStorage.setItem("lyric_ftu_script", "1")
@@ -585,7 +597,7 @@ function Composer() {
         [data-mark-direction]::after {
           content: attr(data-mark-direction);
           display: inline-block; font-size: 9px;
-          background: rgba(196,151,127,0.18); border: 1px solid rgba(196,151,127,0.35);
+          background: rgba(184,149,90,0.18); border: 1px solid rgba(184,149,90,0.35);
           color: #8a6050; border-radius: 100px; padding: 0 5px; margin-left: 3px;
           vertical-align: middle; line-height: 1.7;
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -715,13 +727,6 @@ function Composer() {
 
       {/* ── Script area ──────────────────────────────────────────────────── */}
       <main style={{ flex: 1, padding: "0 24px" }}>
-        <FTUTooltip
-          message="Click to start writing your script. Highlight any phrase to set the emotional direction."
-          visible={ftuScript}
-          anchorRef={scriptAreaRef}
-          onDismiss={dismissFtu1}
-          placement="inline-left"
-        />
         <div ref={scriptAreaRef} style={{ maxWidth: "680px", margin: "0 auto", padding: "48px 0 200px" }}>
 
           {/* Action bar */}
@@ -822,7 +827,7 @@ function Composer() {
               <span
                 style={{
                   position: "absolute", inset: 0,
-                  background: "linear-gradient(90deg, #2a2622 0%, #c4977f 40%, #a07860 60%, #2a2622 100%)",
+                  background: "linear-gradient(90deg, #2a2622 0%, #B8955A 40%, #9A7A45 60%, #2a2622 100%)",
                   backgroundSize: "200% 100%",
                   animation: "lyric-sweep 2s ease-in-out infinite",
                   borderRadius: "14px",
@@ -1051,6 +1056,32 @@ function Composer() {
           </div>
         </div>
       )}
+
+      {/* ── FTU 1: fixed left of first paragraph ─────────────────────── */}
+      {ftuScript && ftuScriptPos.left > 0 && (
+        <div style={{
+          position: "fixed",
+          left: ftuScriptPos.left - 224,
+          top: ftuScriptPos.top,
+          transform: "translateY(-50%)",
+          zIndex: 400,
+          width: "200px",
+          background: "rgba(42,38,34,0.92)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: "12px",
+          padding: "14px 16px",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+          pointerEvents: "none",
+        }}>
+          <div style={{ position: "absolute", top: 0, left: "16px", right: "16px", height: "2px", background: "linear-gradient(90deg, #B8955A, transparent)", borderRadius: "2px 2px 0 0" }} />
+          <p style={{ fontSize: "12px", color: "rgba(248,246,243,0.88)", lineHeight: 1.65, margin: 0, paddingTop: "4px" }}>
+            Click to start writing your script. Highlight any phrase to set the emotional direction.
+          </p>
+          <div style={{ position: "absolute", right: "-7px", top: "50%", transform: "translateY(-50%)", width: 0, height: 0, borderTop: "5px solid transparent", borderBottom: "5px solid transparent", borderLeft: "7px solid rgba(42,38,34,0.92)" }} />
+        </div>
+      )}
     </div>
   )
 }
@@ -1091,20 +1122,19 @@ function ActionButton({
 }
 
 function FTUTooltip({
-  message, visible, anchorRef, onDismiss, placement = "above",
+  message, visible, anchorRef, onDismiss,
 }: {
   message: string
   visible: boolean
   anchorRef: { current: HTMLElement | null }
   onDismiss: () => void
-  placement?: "above" | "inline-left"
 }) {
   const [phase, setPhase] = useState<"hidden" | "in" | "visible" | "out">("hidden")
   const [pos, setPos] = useState({ left: 0, top: 0 })
 
   useEffect(() => {
     if (!visible) { setPhase("hidden"); return }
-    if (placement === "above" && anchorRef.current) {
+    if (anchorRef.current) {
       const rect = anchorRef.current.getBoundingClientRect()
       setPos({ left: rect.left + rect.width / 2, top: rect.top })
     }
@@ -1115,49 +1145,22 @@ function FTUTooltip({
     return () => { clearTimeout(visTimer); clearTimeout(outTimer); clearTimeout(doneTimer) }
   }, [visible]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (placement === "inline-left" && phase !== "hidden" && !visible) {
-      setPhase("out")
-      setTimeout(() => { setPhase("hidden"); onDismiss() }, 400)
-    }
-  }, [visible]) // eslint-disable-line react-hooks/exhaustive-deps
-
   if (phase === "hidden") return null
-
-  const sharedStyle = {
-    width: "200px",
-    background: "rgba(42,38,34,0.92)",
-    backdropFilter: "blur(12px)",
-    WebkitBackdropFilter: "blur(12px)",
-    border: "1px solid rgba(255,255,255,0.08)",
-    borderRadius: "12px",
-    padding: "14px 16px",
-    boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-    opacity: phase === "out" ? 0 : 1,
-    transition: phase === "in"
-      ? "opacity 0.4s cubic-bezier(0.16,1,0.3,1), transform 0.4s cubic-bezier(0.16,1,0.3,1)"
-      : phase === "out" ? "opacity 0.3s ease" : "none",
-  }
-
-  if (placement === "inline-left") {
-    return (
-      <div style={{
-        ...sharedStyle,
-        position: "relative",
-        transform: phase === "in" ? "translateX(-6px)" : "translateX(0)",
-        pointerEvents: "none",
-        marginBottom: "16px",
-      }}>
-        <div style={{ position: "absolute", top: 0, left: "16px", right: "16px", height: "2px", background: "linear-gradient(90deg, #c4977f, transparent)", borderRadius: "2px 2px 0 0" }} />
-        <p style={{ fontSize: "12px", color: "rgba(248,246,243,0.88)", lineHeight: 1.65, margin: 0, paddingTop: "4px" }}>{message}</p>
-        <div style={{ position: "absolute", right: "-7px", top: "50%", transform: "translateY(-50%)", width: 0, height: 0, borderTop: "5px solid transparent", borderBottom: "5px solid transparent", borderLeft: "7px solid rgba(42,38,34,0.92)" }} />
-      </div>
-    )
-  }
 
   return (
     <div style={{
-      ...sharedStyle,
+      width: "200px",
+      background: "rgba(42,38,34,0.92)",
+      backdropFilter: "blur(12px)",
+      WebkitBackdropFilter: "blur(12px)",
+      border: "1px solid rgba(255,255,255,0.08)",
+      borderRadius: "12px",
+      padding: "14px 16px",
+      boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+      opacity: phase === "out" ? 0 : 1,
+      transition: phase === "in"
+        ? "opacity 0.4s cubic-bezier(0.16,1,0.3,1), transform 0.4s cubic-bezier(0.16,1,0.3,1)"
+        : phase === "out" ? "opacity 0.3s ease" : "none",
       position: "fixed",
       left: pos.left,
       top: pos.top - 16,
@@ -1165,7 +1168,7 @@ function FTUTooltip({
       zIndex: 400,
       pointerEvents: "none",
     }}>
-      <div style={{ position: "absolute", top: 0, left: "16px", right: "16px", height: "2px", background: "linear-gradient(90deg, #c4977f, transparent)", borderRadius: "2px 2px 0 0" }} />
+      <div style={{ position: "absolute", top: 0, left: "16px", right: "16px", height: "2px", background: "linear-gradient(90deg, #B8955A, transparent)", borderRadius: "2px 2px 0 0" }} />
       <p style={{ fontSize: "12px", color: "rgba(248,246,243,0.88)", lineHeight: 1.65, margin: 0, paddingTop: "4px" }}>{message}</p>
       <div style={{ position: "absolute", bottom: "-7px", left: "50%", transform: "translateX(-50%)", width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: "7px solid rgba(42,38,34,0.92)" }} />
     </div>
@@ -1206,8 +1209,8 @@ function SelectionToolbar({
           onMouseDown={(e) => { e.preventDefault(); onApply(dir) }}
           style={{
             padding: "3px 9px", borderRadius: "100px",
-            border: `1px solid ${dir === currentDirection ? "#c4977f" : "rgba(255,255,255,0.18)"}`,
-            background: dir === currentDirection ? "rgba(196,151,127,0.28)" : "transparent",
+            border: `1px solid ${dir === currentDirection ? "#B8955A" : "rgba(255,255,255,0.18)"}`,
+            background: dir === currentDirection ? "rgba(184,149,90,0.28)" : "transparent",
             color: "#faf9f7", fontSize: "11px", fontWeight: 500,
             cursor: "pointer", whiteSpace: "nowrap",
           }}
@@ -1285,6 +1288,7 @@ function ParagraphBlock({
         contentEditable
         suppressContentEditableWarning
         data-placeholder="Write your script here…"
+        data-first-para={!canRemove ? "true" : undefined}
         onInput={handleInput}
         onMouseUp={handleMouseUp}
         style={{
@@ -1304,7 +1308,7 @@ function ParagraphBlock({
               key={mark.id}
               style={{
                 display: "inline-flex", alignItems: "center", gap: "4px",
-                background: "rgba(196,151,127,0.12)", border: "1px solid rgba(196,151,127,0.3)",
+                background: "rgba(184,149,90,0.12)", border: "1px solid rgba(184,149,90,0.3)",
                 borderRadius: "100px", padding: "2px 6px 2px 8px",
                 fontSize: "10px", color: "#8a6050",
               }}
@@ -1312,7 +1316,7 @@ function ParagraphBlock({
               {mark.direction}
               <button
                 onClick={() => onMarkRemove(mark.id)}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "#c4977f", fontSize: "11px", lineHeight: 1, padding: 0 }}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#B8955A", fontSize: "11px", lineHeight: 1, padding: 0 }}
               >×</button>
             </span>
           ))}
