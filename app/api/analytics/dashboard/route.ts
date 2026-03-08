@@ -8,10 +8,15 @@ import { neon } from "@neondatabase/serverless"
 import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 
-const sql = neon(process.env.DATABASE_URL!)
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2026-02-25.clover",
-})
+function getDb() {
+  return neon(process.env.DATABASE_URL!)
+}
+
+function getStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: "2026-02-25.clover",
+  })
+}
 
 // ─── Auth guard ───────────────────────────────────────────────────────────────
 
@@ -46,6 +51,7 @@ export async function GET(req: NextRequest) {
   const since = daysAgo(range)
 
   try {
+    const sql = getDb()
     const [
       overviewRows,
       voiceRows,
@@ -221,6 +227,7 @@ async function fetchClerkData() {
 
 async function fetchStripeData() {
   try {
+    const stripe = getStripe()
     const subscriptions = await stripe.subscriptions.list({
       status: "active",
       limit: 100,
