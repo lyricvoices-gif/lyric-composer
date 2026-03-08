@@ -5,6 +5,7 @@ import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react
 import { getAllVoices, VoiceDefinition } from "@/lib/voiceData"
 import { getPlanConfig, remainingGenerations, resolvePlanId, hasPaidPlan } from "@/lib/planConfig"
 import { Plus, Download, RotateCcw, Clock, X } from "lucide-react"
+import { trackGeneration, trackDownload, trackPreview } from "@/lib/analytics"
 
 const FRAMER_URL = "https://formal-organization-793965.framer.app"
 
@@ -275,6 +276,7 @@ function Composer() {
     audio.onended = () => setPlayingSampleId(null)
     audio.play().catch(() => {})
     setPlayingSampleId(voice.id)
+    trackPreview({ voiceId: voice.id })
   }
 
   // ---------------------------------------------------------------------------
@@ -351,6 +353,7 @@ function Composer() {
 
     setIsGenerating(true)
     setGenerationError(null)
+    const startedAt = Date.now()
 
     try {
       const res = await fetch("/api/generate", {
@@ -378,6 +381,23 @@ function Composer() {
       setCurrentTime(0)
       setUsedToday((n) => n + 1)
       saveComposition().catch((err) => console.error("[auto-save]", err))
+
+      // Analytics — dominant direction = mark covering most chars, else active variant
+      const markCounts: Record<string, number> = {}
+      for (const p of paragraphs) {
+        for (const m of p.marks) markCounts[m.direction] = (markCounts[m.direction] ?? 0) + (m.end - m.start)
+      }
+      const entries = Object.entries(markCounts)
+      const dominantDirection = entries.length
+        ? entries.reduce((a, b) => (b[1] > a[1] ? b : a))[0]
+        : activeVariant
+      trackGeneration({
+        voiceId: activeVoice.id,
+        voiceVariant: activeVariant,
+        emotionalDirection: dominantDirection,
+        characterCount: assembledScript.length,
+        durationMs: Date.now() - startedAt,
+      })
     } catch (err) {
       setGenerationError(err instanceof Error ? err.message : "Generation failed")
     } finally {
@@ -411,6 +431,11 @@ function Composer() {
     a.download = `${activeVoice.id}-${activeVariant.toLowerCase()}.wav`
     a.click()
     URL.revokeObjectURL(url)
+    trackDownload({
+      voiceId: activeVoice.id,
+      voiceVariant: activeVariant,
+      audioDurationS: duration > 0 ? duration : undefined,
+    })
   }
 
   // ---------------------------------------------------------------------------
