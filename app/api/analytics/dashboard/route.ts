@@ -10,7 +10,7 @@ import Stripe from "stripe"
 
 const sql = neon(process.env.DATABASE_URL!)
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-06-20",
+  apiVersion: "2026-02-25.clover",
 })
 
 // ─── Auth guard ───────────────────────────────────────────────────────────────
@@ -29,9 +29,16 @@ function daysAgo(n: number): Date {
 // ─── Route Handler ────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId || !ADMIN_USER_IDS.includes(userId)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  // Allow server-to-server access via Bearer token (analytics dashboard app)
+  const analyticsSecret = process.env.ANALYTICS_SECRET
+  const bearer = req.headers.get("authorization")?.replace("Bearer ", "")
+  const hasValidBearer = analyticsSecret && bearer === analyticsSecret
+
+  if (!hasValidBearer) {
+    const { userId } = await auth()
+    if (!userId || !ADMIN_USER_IDS.includes(userId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
   }
 
   const { searchParams } = new URL(req.url)
