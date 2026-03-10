@@ -142,7 +142,7 @@ function FramerRedirect() {
 function NoPlanWall() {
   return (
     <div style={{ minHeight: "100vh", background: "#faf9f7", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px" }}>
-      <p style={{ fontFamily: "Agrandir, sans-serif", fontSize: "15px", fontWeight: 800, letterSpacing: "0.04em", color: "#b5aca3", marginBottom: "40px" }}>lyric</p>
+      <p style={{ fontFamily: "Agrandir, sans-serif", fontSize: "15px", fontWeight: 400, letterSpacing: "0.04em", color: "#b5aca3", marginBottom: "40px" }}>lyric</p>
       <div style={{ maxWidth: "320px", textAlign: "center", display: "flex", flexDirection: "column", gap: "16px" }}>
         <h1 style={{ fontSize: "18px", fontWeight: 600, letterSpacing: "-0.02em", color: "#2a2622" }}>Composer requires a plan</h1>
         <p style={{ fontSize: "14px", color: "#756d65", lineHeight: 1.6 }}>
@@ -664,7 +664,7 @@ function Composer() {
         background: "rgba(248,246,243,0.96)", backdropFilter: "blur(16px)",
         borderBottom: "1px solid #eae4de",
       }}>
-        <span style={{ fontFamily: "Agrandir, sans-serif", fontSize: "15px", fontWeight: 800, letterSpacing: "0.04em", color: "#2a2622" }}>
+        <span style={{ fontFamily: "Agrandir, sans-serif", fontSize: "15px", fontWeight: 400, letterSpacing: "0.04em", color: "#2a2622" }}>
           lyric
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
