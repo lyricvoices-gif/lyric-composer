@@ -11,6 +11,7 @@ export interface TrackPayload {
   characterCount?: number
   durationMs?: number
   audioDurationS?: number
+  genomeEventId?: string
   metadata?: Record<string, unknown>
 }
 

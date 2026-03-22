@@ -18,6 +18,7 @@
 import { Webhook } from "svix"
 import { headers } from "next/headers"
 import { clerkClient } from "@clerk/nextjs/server"
+import { neon } from "@neondatabase/serverless"
 import type { UserMetadata } from "@/lib/planConfig"
 import {
   sendTrialWelcome,
@@ -105,6 +106,22 @@ export async function POST(req: Request): Promise<Response> {
       })
     } catch (err) {
       console.error("[webhook/clerk] Failed to set trial_ends_at:", err)
+      // Non-fatal — continue to create profile and send emails
+    }
+
+    // ── Write user_profiles row ───────────────────────────────────────────
+    try {
+      const sql = neon(process.env.DATABASE_URL!)
+      const now = new Date()
+      await sql`
+        INSERT INTO user_profiles
+          (clerk_user_id, email, trial_started_at, trial_ends_at, plan_tier)
+        VALUES
+          (${user.id}, ${email}, ${now.toISOString()}, ${trialEndsAt.toISOString()}, 'trial')
+        ON CONFLICT (clerk_user_id) DO NOTHING
+      `
+    } catch (err) {
+      console.error("[webhook/clerk] Failed to write user_profiles:", err)
       // Non-fatal — continue to send emails
     }
 

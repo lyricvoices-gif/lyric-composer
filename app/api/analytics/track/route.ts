@@ -21,6 +21,7 @@ export async function POST(req: Request): Promise<Response> {
     characterCount?: number
     durationMs?: number
     audioDurationS?: number
+    genomeEventId?: string
     metadata?: Record<string, unknown>
   }
   try {
@@ -53,6 +54,26 @@ export async function POST(req: Request): Promise<Response> {
         ${body.metadata ? JSON.stringify(body.metadata) : "{}"}
       )
     `
+
+    // Mark genome event as downloaded
+    if (body.eventType === "download" && body.genomeEventId) {
+      sql`
+        UPDATE voice_genome_events
+        SET downloaded = TRUE
+        WHERE id = ${body.genomeEventId}::uuid
+          AND clerk_user_id = ${userId}
+      `.catch(() => {})
+    }
+
+    // Backfill audio duration on genome event after generation
+    if (body.eventType === "generation" && body.genomeEventId && body.audioDurationS != null) {
+      sql`
+        UPDATE voice_genome_events
+        SET audio_duration_s = ${body.audioDurationS}
+        WHERE id = ${body.genomeEventId}::uuid
+          AND clerk_user_id = ${userId}
+      `.catch(() => {})
+    }
   } catch (err) {
     console.error("[analytics/track]", err)
   }

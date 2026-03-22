@@ -20,7 +20,7 @@
  *   );
  */
 
-import { auth } from "@clerk/nextjs/server"
+import { auth, clerkClient } from "@clerk/nextjs/server"
 import { neon } from "@neondatabase/serverless"
 import { getVoice, VoiceId } from "@/lib/voiceData"
 import { getPlanConfig, isUnderDailyLimit, remainingGenerations, resolvePlanId } from "@/lib/planConfig"
@@ -228,8 +228,105 @@ export async function POST(req: Request): Promise<Response> {
     console.error("[generate] Failed to increment usage for", userId, err)
   })
 
+  // ── 8. Write voice genome event (non-blocking) ────────────────────────────
+  const planTier = resolvePlanId(has)
+  const genomeEventId = crypto.randomUUID()
+  responseHeaders.set("X-Genome-Event-Id", genomeEventId)
+
+  writeGenomeEvent({
+    genomeEventId,
+    userId,
+    voiceId,
+    variant,
+    script,
+    direction,
+    segments,
+    planTier,
+    modelId: workerRes.headers.get("X-Model-Id") ?? null,
+  }).catch((err) => {
+    console.error("[generate] Failed to write genome event:", err)
+  })
+
   return new Response(workerRes.body, {
     status: 200,
     headers: responseHeaders,
   })
+}
+
+// ---------------------------------------------------------------------------
+// Voice genome helper
+// ---------------------------------------------------------------------------
+
+function extractDirectionMarks(segments: Segment[]): string[] {
+  const marks = new Set<string>()
+  for (const seg of segments ?? []) {
+    if (seg.emotion) marks.add(seg.emotion)
+  }
+  return Array.from(marks)
+}
+
+async function writeGenomeEvent(opts: {
+  genomeEventId: string
+  userId: string
+  voiceId: string
+  variant: string
+  script: string
+  direction: Direction
+  segments: Segment[]
+  planTier: string
+  modelId: string | null
+}): Promise<void> {
+  const { genomeEventId, userId, voiceId, variant, script, direction, segments, planTier, modelId } = opts
+  const sql = db()
+
+  // Fetch user's onboarding_intent (use_case)
+  let useCase: string | null = null
+  try {
+    const clerk = await clerkClient()
+    const user = await clerk.users.getUser(userId)
+    useCase = (user.publicMetadata?.onboarding_intent as string) ?? null
+  } catch {
+    // non-fatal
+  }
+
+  // Direction marks from segments
+  const directionMarksUsed = extractDirectionMarks(segments)
+  if (direction?.intent) directionMarksUsed.push(direction.intent)
+  const directionMarkCount = segments?.filter((s) => s.emotion).length ?? 0
+
+  // Session position — count of genome events for this user today + 1
+  const posRows = await sql`
+    SELECT COUNT(*) AS cnt
+    FROM voice_genome_events
+    WHERE clerk_user_id = ${userId}
+      AND created_at >= CURRENT_DATE
+  `
+  const sessionPosition = Number((posRows[0] as { cnt: string }).cnt) + 1
+
+  // Regenerated — same voice+variant in last 60s
+  const regenRows = await sql`
+    SELECT 1 FROM voice_genome_events
+    WHERE clerk_user_id = ${userId}
+      AND voice_id = ${voiceId}
+      AND variant = ${variant}
+      AND created_at >= NOW() - INTERVAL '60 seconds'
+    LIMIT 1
+  `
+  const regenerated = regenRows.length > 0
+
+  await sql`
+    INSERT INTO voice_genome_events (
+      id, clerk_user_id, voice_id, variant, use_case,
+      script_length, direction_marks_used, direction_mark_count,
+      regenerated, session_position, plan_tier,
+      emotional_direction, character_count,
+      provider, model_id
+    ) VALUES (
+      ${genomeEventId}::uuid, ${userId}, ${voiceId}, ${variant}, ${useCase},
+      ${script.length}, ${directionMarksUsed}, ${directionMarkCount},
+      ${regenerated}, ${sessionPosition}, ${planTier},
+      ${direction?.intent ?? null}, ${script.length},
+      'hume', ${modelId}
+    )
+  `
 }

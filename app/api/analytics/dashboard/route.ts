@@ -62,6 +62,7 @@ export async function GET(req: NextRequest) {
       latencyRows,
       clerkData,
       stripeData,
+      trialData,
     ] = await Promise.all([
       // ── Overview totals ──────────────────────────────────────────────────
       sql`
@@ -168,6 +169,9 @@ export async function GET(req: NextRequest) {
 
       // ── Stripe: MRR, subscriptions, recent events ────────────────────────
       fetchStripeData(),
+
+      // ── Trial funnel, intent breakdown, voice affinity ───────────────────
+      fetchTrialData(),
     ])
 
     return NextResponse.json({
@@ -182,6 +186,7 @@ export async function GET(req: NextRequest) {
       latency: latencyRows[0] ?? {},
       clerk: clerkData,
       stripe: stripeData,
+      trial: trialData,
     })
   } catch (err) {
     console.error("[analytics/dashboard] Error:", err)
@@ -220,6 +225,27 @@ async function fetchClerkData() {
   } catch (err) {
     console.error("[analytics/dashboard] Clerk fetch failed:", err)
     return { error: "Clerk data unavailable" }
+  }
+}
+
+// ─── Trial data fetcher ───────────────────────────────────────────────────────
+
+async function fetchTrialData() {
+  try {
+    const sql = getDb()
+    const [funnelRows, intentRows, affinityRows] = await Promise.all([
+      sql`SELECT * FROM trial_funnel`,
+      sql`SELECT * FROM intent_breakdown`,
+      sql`SELECT * FROM voice_affinity`,
+    ])
+    return {
+      funnel: funnelRows[0] ?? null,
+      intent_breakdown: intentRows,
+      voice_affinity: affinityRows,
+    }
+  } catch (err) {
+    console.error("[analytics/dashboard] Trial data fetch failed:", err)
+    return { error: "Trial data unavailable" }
   }
 }
 
