@@ -63,6 +63,7 @@ export async function GET(req: NextRequest) {
       clerkData,
       stripeData,
       trialData,
+      genomeData,
     ] = await Promise.all([
       // ── Overview totals ──────────────────────────────────────────────────
       sql`
@@ -172,6 +173,9 @@ export async function GET(req: NextRequest) {
 
       // ── Trial funnel, intent breakdown, voice affinity ───────────────────
       fetchTrialData(),
+
+      // ── Voice genome: download/regen performance, use case breakdown ──────
+      fetchGenomeData(),
     ])
 
     return NextResponse.json({
@@ -187,6 +191,7 @@ export async function GET(req: NextRequest) {
       clerk: clerkData,
       stripe: stripeData,
       trial: trialData,
+      genome: genomeData,
     })
   } catch (err) {
     console.error("[analytics/dashboard] Error:", err)
@@ -313,5 +318,24 @@ async function fetchStripeData() {
   } catch (err) {
     console.error("[analytics/dashboard] Stripe fetch failed:", err)
     return { error: "Stripe data unavailable" }
+  }
+}
+
+// ─── Voice genome data fetcher ────────────────────────────────────────────────
+
+async function fetchGenomeData() {
+  try {
+    const sql = getDb()
+    const [downloadPerf, useCaseRows] = await Promise.all([
+      sql`SELECT * FROM voice_download_performance`,
+      sql`SELECT * FROM voice_genome_by_use_case`,
+    ])
+    return {
+      download_performance: downloadPerf,
+      use_case_breakdown: useCaseRows,
+    }
+  } catch (err) {
+    console.error("[analytics/dashboard] Genome fetch failed:", err)
+    return { error: "Genome data unavailable" }
   }
 }
