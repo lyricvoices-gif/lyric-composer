@@ -218,7 +218,9 @@ async function fetchClerkData() {
 
     const planCounts: Record<string, number> = {}
     for (const user of recentUsers.data) {
-      const tier = (user.publicMetadata?.plan as string) ?? "unknown"
+      const raw = (user.publicMetadata?.plan as string) ?? "unknown"
+      // "unknown" means no plan metadata set — treat as creator (base paid plan)
+      const tier = raw === "unknown" ? "creator" : raw
       planCounts[tier] = (planCounts[tier] ?? 0) + 1
     }
 
@@ -262,7 +264,7 @@ async function fetchStripeData() {
     const subscriptions = await stripe.subscriptions.list({
       status: "active",
       limit: 100,
-      expand: ["data.items.data.price"],
+      expand: ["data.items.data.price.product"],
     })
 
     let mrr = 0
@@ -273,9 +275,16 @@ async function fetchStripeData() {
         const price = item.price
         const amount = price.unit_amount ?? 0
         const interval = price.recurring?.interval
-        const nickname = price.nickname ?? price.id
 
-        planCounts[nickname] = (planCounts[nickname] ?? 0) + 1
+        // Prefer product name → price nickname → price id
+        const product = price.product
+        const planName = (
+          (typeof product === "object" && product !== null && !("deleted" in product))
+            ? (product as Stripe.Product).name
+            : price.nickname
+        ) ?? price.id
+
+        planCounts[planName] = (planCounts[planName] ?? 0) + 1
 
         if (interval === "month") {
           mrr += amount / 100
