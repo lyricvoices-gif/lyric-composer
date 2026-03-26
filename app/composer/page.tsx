@@ -7,7 +7,7 @@ import { getPlanConfig, remainingGenerations, resolvePlanId, hasPaidPlan } from 
 import { Plus, Download, RotateCcw, Clock, X } from "lucide-react"
 import { trackGeneration, trackDownload, trackPreview } from "@/lib/analytics"
 
-const FRAMER_URL = "https://formal-organization-793965.framer.app"
+const MARKETING_URL = "https://lyric-marketing.vercel.app"
 
 // Change 4: 6 inline directions
 const INLINE_DIRECTIONS = ["Emphasis", "Pause", "Whisper", "Slow", "Tender", "Resolute"]
@@ -135,31 +135,13 @@ export default function ComposerPage() {
 }
 
 function FramerRedirect() {
-  useEffect(() => { window.location.replace(FRAMER_URL) }, [])
+  useEffect(() => { window.location.replace(MARKETING_URL) }, [])
   return null
 }
 
 function NoPlanWall() {
-  return (
-    <div style={{ minHeight: "100vh", background: "#faf9f7", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px" }}>
-      <p style={{ fontFamily: "Agrandir, sans-serif", fontSize: "15px", fontWeight: 400, letterSpacing: "0.04em", color: "#b5aca3", marginBottom: "40px" }}>lyric</p>
-      <div style={{ maxWidth: "320px", textAlign: "center", display: "flex", flexDirection: "column", gap: "16px" }}>
-        <h1 style={{ fontSize: "18px", fontWeight: 600, letterSpacing: "-0.02em", color: "#2a2622" }}>Composer requires a plan</h1>
-        <p style={{ fontSize: "14px", color: "#756d65", lineHeight: 1.6 }}>
-          Lyric Composer is available on Creator, Studio, and Enterprise plans.
-        </p>
-        <a href="/upgrade" style={{ marginTop: "8px", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "10px 24px", borderRadius: "12px", background: "#2a2622", color: "#faf9f7", fontSize: "14px", fontWeight: 500, textDecoration: "none" }}>
-          View plans
-        </a>
-        <p style={{ fontSize: "12px", color: "#b5aca3", marginTop: "8px" }}>
-          Already subscribed? Sign out and sign back in to refresh your session.
-        </p>
-        <div style={{ display: "flex", justifyContent: "center", marginTop: "4px" }}>
-          <UserButton afterSignOutUrl={FRAMER_URL} />
-        </div>
-      </div>
-    </div>
-  )
+  useEffect(() => { window.location.replace(`${MARKETING_URL}/pricing`) }, [])
+  return null
 }
 
 // ---------------------------------------------------------------------------
@@ -682,7 +664,7 @@ function Composer() {
               </span>
             </>
           )}
-          <UserButton afterSignOutUrl="/" />
+          <UserButton afterSignOutUrl={MARKETING_URL} />
         </div>
       </header>
 

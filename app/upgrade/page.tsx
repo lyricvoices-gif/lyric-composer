@@ -125,7 +125,7 @@ function UpgradeContent() {
               <CheckoutButton
                 planId={plan.planId}
                 planPeriod="month"
-                newSubscriptionRedirectUrl="https://composer.lyricvoices.com"
+                newSubscriptionRedirectUrl="https://composer.lyricvoices.ai"
               >
                 <button
                   style={{
@@ -152,7 +152,7 @@ function UpgradeContent() {
         <p style={{ textAlign: "center", fontSize: "12px", color: "#b5aca3", marginTop: "32px", lineHeight: 1.6 }}>
           Payments processed securely by Stripe.{" "}
           Need Enterprise?{" "}
-          <a href="mailto:hello@lyricvoices.com" style={{ color: "#756d65", textDecoration: "none" }}>
+          <a href="mailto:hello@lyricvoices.ai" style={{ color: "#756d65", textDecoration: "none" }}>
             Contact us.
           </a>
         </p>
