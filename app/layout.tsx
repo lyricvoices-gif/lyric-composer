@@ -24,7 +24,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <ClerkProvider signUpForceRedirectUrl="/onboarding" signInFallbackRedirectUrl="/composer" clerkJSVersion="5.43.7">
+    <ClerkProvider signUpForceRedirectUrl="/onboarding" signInFallbackRedirectUrl="/composer" clerkJSVersion="5.78.0">
       <html lang="en">
         <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
           {children}
