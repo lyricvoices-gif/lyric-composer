@@ -145,9 +145,9 @@ function SignOutButton() {
     <button
       onClick={handleSignOut}
       style={{
-        background: "none", border: "none", cursor: "pointer",
+        background: "#eae4de", border: "none", cursor: "pointer",
         width: "28px", height: "28px", borderRadius: "50%",
-        background: "#eae4de", display: "flex", alignItems: "center",
+        display: "flex", alignItems: "center",
         justifyContent: "center", flexShrink: 0,
       }}
       title="Sign out"
