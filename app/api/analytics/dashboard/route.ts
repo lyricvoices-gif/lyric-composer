@@ -1,9 +1,8 @@
 // app/api/analytics/dashboard/route.ts
 // Serves all data needed by the analytics dashboard in a single request.
-// Pulls from Neon (composer events), Clerk (users), and Stripe (revenue).
+// Pulls from Neon (composer events, user_profiles) and Stripe (revenue).
 
-import { auth } from "@clerk/nextjs/server"
-import { clerkClient } from "@clerk/nextjs/server"
+import { createClient } from "@/lib/supabase/server"
 import { neon } from "@neondatabase/serverless"
 import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
@@ -40,8 +39,9 @@ export async function GET(req: NextRequest) {
   const hasValidBearer = analyticsSecret && bearer === analyticsSecret
 
   if (!hasValidBearer) {
-    const { userId } = await auth()
-    if (!userId || !ADMIN_USER_IDS.includes(userId)) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user || !ADMIN_USER_IDS.includes(user.id)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
   }
@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
       planRows,
       dailyRows,
       latencyRows,
-      clerkData,
+      userData,
       stripeData,
       trialData,
       genomeData,
@@ -165,8 +165,8 @@ export async function GET(req: NextRequest) {
           AND created_at >= ${since.toISOString()}
       `,
 
-      // ── Clerk: user growth & plan breakdown ──────────────────────────────
-      fetchClerkData(),
+      // ── User growth & plan breakdown from user_profiles ──────────────────
+      fetchUserData(),
 
       // ── Stripe: MRR, subscriptions, recent events ────────────────────────
       fetchStripeData(),
@@ -188,7 +188,7 @@ export async function GET(req: NextRequest) {
       plan_breakdown: planRows,
       daily_trend: dailyRows,
       latency: latencyRows[0] ?? {},
-      clerk: clerkData,
+      users: userData,
       stripe: stripeData,
       trial: trialData,
       genome: genomeData,
@@ -199,39 +199,39 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// ─── Clerk data fetcher ───────────────────────────────────────────────────────
+// ─── User data fetcher (from user_profiles) ───────────────────────────────────
 
-async function fetchClerkData() {
+async function fetchUserData() {
   try {
-    const clerk = await clerkClient()
-    const { totalCount } = await clerk.users.getUserList({ limit: 1 })
+    const sql = getDb()
+    const thirtyDaysAgo = daysAgo(30).toISOString()
 
-    const thirtyDaysAgo = daysAgo(30)
-    const recentUsers = await clerk.users.getUserList({
-      limit: 100,
-      orderBy: "-created_at",
-    })
+    const [totalRows, newRows, planRows] = await Promise.all([
+      sql`SELECT COUNT(*) AS total FROM user_profiles`,
+      sql`SELECT COUNT(*) AS count FROM user_profiles WHERE trial_started_at >= ${thirtyDaysAgo}`,
+      sql`
+        SELECT
+          COALESCE(plan_tier, 'trial') AS plan_tier,
+          COUNT(*) AS count
+        FROM user_profiles
+        GROUP BY plan_tier
+        ORDER BY count DESC
+      `,
+    ])
 
-    const newUsersLast30d = recentUsers.data.filter(
-      (u) => new Date(u.createdAt) >= thirtyDaysAgo
-    ).length
-
-    const planCounts: Record<string, number> = {}
-    for (const user of recentUsers.data) {
-      const raw = (user.publicMetadata?.plan as string) ?? "unknown"
-      // "unknown" means no plan metadata set — treat as creator (base paid plan)
-      const tier = raw === "unknown" ? "creator" : raw
-      planCounts[tier] = (planCounts[tier] ?? 0) + 1
+    const planDistribution: Record<string, number> = {}
+    for (const row of planRows as { plan_tier: string; count: string }[]) {
+      planDistribution[row.plan_tier] = Number(row.count)
     }
 
     return {
-      total_users: totalCount,
-      new_users_last_30d: newUsersLast30d,
-      plan_distribution: planCounts,
+      total_users: Number((totalRows[0] as { total: string }).total),
+      new_users_last_30d: Number((newRows[0] as { count: string }).count),
+      plan_distribution: planDistribution,
     }
   } catch (err) {
-    console.error("[analytics/dashboard] Clerk fetch failed:", err)
-    return { error: "Clerk data unavailable" }
+    console.error("[analytics/dashboard] User data fetch failed:", err)
+    return { error: "User data unavailable" }
   }
 }
 
@@ -276,7 +276,6 @@ async function fetchStripeData() {
         const amount = price.unit_amount ?? 0
         const interval = price.recurring?.interval
 
-        // Prefer product name → price nickname → price id
         const product = price.product
         const planName = (
           (typeof product === "object" && product !== null && !("deleted" in product))
