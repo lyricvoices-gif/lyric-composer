@@ -1,19 +1,20 @@
 /**
  * app/onboarding/page.tsx
- * Server wrapper — checks if onboarding is already done (always-fresh via currentUser)
- * and redirects to /composer if so, bypassing the JWT refresh race condition.
+ * Server wrapper — checks if onboarding is already done and redirects
+ * to /composer if so, bypassing the JWT refresh race condition.
  */
 
-import { currentUser } from "@clerk/nextjs/server"
+import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
-import type { UserMetadata } from "@/lib/planConfig"
 import OnboardingFlow from "./OnboardingFlow"
 
 export default async function OnboardingPage() {
-  const user = await currentUser()
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
   if (!user) redirect("/sign-in")
 
-  const meta = (user.publicMetadata ?? {}) as UserMetadata
+  const meta = user.app_metadata ?? {}
   if (meta.onboarding_complete) redirect("/composer")
 
   return <OnboardingFlow />

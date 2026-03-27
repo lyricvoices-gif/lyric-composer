@@ -3,24 +3,17 @@
  * Authenticated proxy from the Next.js composer to the Cloudflare voice worker.
  *
  * Flow:
- *  1. Auth via Clerk — 401 if no valid session
+ *  1. Auth via Supabase — 401 if no valid session
  *  2. Parse and validate request body
  *  3. Check plan + daily usage limit — 429 if exceeded
  *  4. Validate voiceId + variant against lib/voiceData — 400 if invalid
  *  5. Forward full payload to the Cloudflare worker
  *  6. Stream MP3 response back with worker headers passed through
  *  7. Increment daily usage counter (non-blocking)
- *
- * Required DB table (Neon):
- *   CREATE TABLE generation_usage (
- *     user_id TEXT    NOT NULL,
- *     date    DATE    NOT NULL DEFAULT CURRENT_DATE,
- *     count   INTEGER NOT NULL DEFAULT 0,
- *     PRIMARY KEY (user_id, date)
- *   );
+ *  8. Write voice genome event (non-blocking)
  */
 
-import { auth, clerkClient } from "@clerk/nextjs/server"
+import { createClient } from "@/lib/supabase/server"
 import { neon } from "@neondatabase/serverless"
 import { getVoice, VoiceId } from "@/lib/voiceData"
 import { getPlanConfig, isUnderDailyLimit, remainingGenerations, resolvePlanId } from "@/lib/planConfig"
@@ -105,10 +98,13 @@ async function incrementDailyUsage(userId: string): Promise<void> {
 
 export async function POST(req: Request): Promise<Response> {
   // ── 1. Auth ───────────────────────────────────────────────────────────────
-  const { userId, has } = await auth()
-  if (!userId) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
     return Response.json({ error: "Unauthorized" }, { status: 401 })
   }
+
+  const planTier = resolvePlanId(user.app_metadata?.plan_tier)
 
   // ── 2. Parse body ─────────────────────────────────────────────────────────
   let body: GenerateRequest
@@ -128,7 +124,7 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   // ── 3. Plan + usage check ─────────────────────────────────────────────────
-  const plan = getPlanConfig(resolvePlanId(has))
+  const plan = getPlanConfig(planTier)
 
   if (script.length > plan.maxScriptCharacters) {
     return Response.json(
@@ -144,7 +140,7 @@ export async function POST(req: Request): Promise<Response> {
 
   let currentUsage: number
   try {
-    currentUsage = await getDailyUsage(userId)
+    currentUsage = await getDailyUsage(user.id)
   } catch (err) {
     console.error("[generate] Failed to read usage:", err)
     return Response.json(
@@ -224,18 +220,18 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   // ── 7. Increment usage (non-blocking — generation already succeeded) ───────
-  incrementDailyUsage(userId).catch((err) => {
-    console.error("[generate] Failed to increment usage for", userId, err)
+  incrementDailyUsage(user.id).catch((err) => {
+    console.error("[generate] Failed to increment usage for", user.id, err)
   })
 
   // ── 8. Write voice genome event (non-blocking) ────────────────────────────
-  const planTier = resolvePlanId(has)
   const genomeEventId = crypto.randomUUID()
   responseHeaders.set("X-Genome-Event-Id", genomeEventId)
 
   writeGenomeEvent({
     genomeEventId,
-    userId,
+    userId: user.id,
+    onboardingIntent: (user.app_metadata?.onboarding_intent as string) ?? null,
     voiceId,
     variant,
     script,
@@ -268,6 +264,7 @@ function extractDirectionMarks(segments: Segment[]): string[] {
 async function writeGenomeEvent(opts: {
   genomeEventId: string
   userId: string
+  onboardingIntent: string | null
   voiceId: string
   variant: string
   script: string
@@ -276,18 +273,8 @@ async function writeGenomeEvent(opts: {
   planTier: string
   modelId: string | null
 }): Promise<void> {
-  const { genomeEventId, userId, voiceId, variant, script, direction, segments, planTier, modelId } = opts
+  const { genomeEventId, userId, onboardingIntent, voiceId, variant, script, direction, segments, planTier, modelId } = opts
   const sql = db()
-
-  // Fetch user's onboarding_intent (use_case)
-  let useCase: string | null = null
-  try {
-    const clerk = await clerkClient()
-    const user = await clerk.users.getUser(userId)
-    useCase = (user.publicMetadata?.onboarding_intent as string) ?? null
-  } catch {
-    // non-fatal
-  }
 
   // Direction marks from segments
   const directionMarksUsed = extractDirectionMarks(segments)
@@ -298,7 +285,7 @@ async function writeGenomeEvent(opts: {
   const posRows = await sql`
     SELECT COUNT(*) AS cnt
     FROM voice_genome_events
-    WHERE clerk_user_id = ${userId}
+    WHERE user_id = ${userId}
       AND created_at >= CURRENT_DATE
   `
   const sessionPosition = Number((posRows[0] as { cnt: string }).cnt) + 1
@@ -306,7 +293,7 @@ async function writeGenomeEvent(opts: {
   // Regenerated — same voice+variant in last 60s
   const regenRows = await sql`
     SELECT 1 FROM voice_genome_events
-    WHERE clerk_user_id = ${userId}
+    WHERE user_id = ${userId}
       AND voice_id = ${voiceId}
       AND variant = ${variant}
       AND created_at >= NOW() - INTERVAL '60 seconds'
@@ -316,13 +303,13 @@ async function writeGenomeEvent(opts: {
 
   await sql`
     INSERT INTO voice_genome_events (
-      id, clerk_user_id, voice_id, variant, use_case,
+      id, user_id, voice_id, variant, use_case,
       script_length, direction_marks_used, direction_mark_count,
       regenerated, session_position, plan_tier,
       emotional_direction, character_count,
       provider, model_id
     ) VALUES (
-      ${genomeEventId}::uuid, ${userId}, ${voiceId}, ${variant}, ${useCase},
+      ${genomeEventId}::uuid, ${userId}, ${voiceId}, ${variant}, ${onboardingIntent},
       ${script.length}, ${directionMarksUsed}, ${directionMarkCount},
       ${regenerated}, ${sessionPosition}, ${planTier},
       ${direction?.intent ?? null}, ${script.length},

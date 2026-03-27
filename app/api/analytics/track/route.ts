@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server"
+import { createClient } from "@/lib/supabase/server"
 import { neon } from "@neondatabase/serverless"
 import { resolvePlanId } from "@/lib/planConfig"
 
@@ -10,8 +10,9 @@ function db() {
 
 export async function POST(req: Request): Promise<Response> {
   // Auth — return 204 silently if unauthenticated (analytics should never block)
-  const { userId, has } = await auth()
-  if (!userId) return new Response(null, { status: 204 })
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return new Response(null, { status: 204 })
 
   let body: {
     eventType: string
@@ -32,7 +33,7 @@ export async function POST(req: Request): Promise<Response> {
 
   if (!body.eventType || !body.voiceId) return new Response(null, { status: 204 })
 
-  const planTier = resolvePlanId(has)
+  const planTier = resolvePlanId(user.app_metadata?.plan_tier)
 
   try {
     const sql = db()
@@ -42,7 +43,7 @@ export async function POST(req: Request): Promise<Response> {
         emotional_direction, character_count, duration_ms, audio_duration_s,
         plan_tier, metadata
       ) VALUES (
-        ${userId},
+        ${user.id},
         ${body.eventType},
         ${body.voiceId},
         ${body.voiceVariant ?? null},
@@ -61,7 +62,7 @@ export async function POST(req: Request): Promise<Response> {
         UPDATE voice_genome_events
         SET downloaded = TRUE
         WHERE id = ${body.genomeEventId}::uuid
-          AND clerk_user_id = ${userId}
+          AND user_id = ${user.id}
       `.catch(() => {})
     }
 
@@ -71,7 +72,7 @@ export async function POST(req: Request): Promise<Response> {
         UPDATE voice_genome_events
         SET audio_duration_s = ${body.audioDurationS}
         WHERE id = ${body.genomeEventId}::uuid
-          AND clerk_user_id = ${userId}
+          AND user_id = ${user.id}
       `.catch(() => {})
     }
   } catch (err) {

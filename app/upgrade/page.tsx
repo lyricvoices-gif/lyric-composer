@@ -1,13 +1,15 @@
 "use client"
 
-import { SignedIn, SignedOut, RedirectToSignIn } from "@clerk/nextjs"
-import { CheckoutButton } from "@clerk/nextjs/experimental"
+import { useState } from "react"
+import { createClient } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
+
+const MARKETING_URL = "https://lyricvoices.ai"
 
 const PLANS = [
   {
     id: "creator",
     label: "Creator",
-    planId: "cplan_3AMe0aHz06gksOmyElvNhhLEzr2",
     price: "$29",
     period: "month",
     features: [
@@ -21,7 +23,6 @@ const PLANS = [
   {
     id: "studio",
     label: "Studio",
-    planId: "cplan_3AMe5c5UiyUse0fOdtMwkcbQ9wC",
     price: "$99",
     period: "month",
     features: [
@@ -36,19 +37,36 @@ const PLANS = [
 ] as const
 
 export default function UpgradePage() {
-  return (
-    <>
-      <SignedIn>
-        <UpgradeContent />
-      </SignedIn>
-      <SignedOut>
-        <RedirectToSignIn redirectUrl="/upgrade" />
-      </SignedOut>
-    </>
-  )
-}
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
+  const router = useRouter()
 
-function UpgradeContent() {
+  // Guard: redirect to sign-in if no session
+  const supabase = createClient()
+  supabase.auth.getUser().then(({ data: { user } }) => {
+    if (!user) router.replace("/sign-in")
+  })
+
+  async function handleCheckout(planId: string) {
+    setLoadingPlan(planId)
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId }),
+      })
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        console.error("[upgrade] No checkout URL:", data)
+        setLoadingPlan(null)
+      }
+    } catch (err) {
+      console.error("[upgrade] Checkout error:", err)
+      setLoadingPlan(null)
+    }
+  }
+
   return (
     <div style={{ minHeight: "100vh", background: "#f8f6f3", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
 
@@ -59,7 +77,7 @@ function UpgradeContent() {
         borderBottom: "1px solid #eae4de",
         background: "rgba(248,246,243,0.96)",
       }}>
-        <a href="/composer" style={{ textDecoration: "none" }}>
+        <a href={MARKETING_URL} style={{ textDecoration: "none" }}>
           <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.2em", color: "#2a2622", textTransform: "uppercase" }}>
             Lyric
           </span>
@@ -122,28 +140,25 @@ function UpgradeContent() {
               </ul>
 
               {/* Checkout button */}
-              <CheckoutButton
-                planId={plan.planId}
-                planPeriod="month"
-                newSubscriptionRedirectUrl="https://composer.lyricvoices.ai"
+              <button
+                onClick={() => handleCheckout(plan.id)}
+                disabled={loadingPlan !== null}
+                style={{
+                  width: "100%",
+                  padding: "11px",
+                  borderRadius: "10px",
+                  border: "none",
+                  fontSize: "13px",
+                  fontWeight: 500,
+                  cursor: loadingPlan !== null ? "not-allowed" : "pointer",
+                  background: plan.highlighted ? "#2a2622" : "#eae4de",
+                  color: plan.highlighted ? "#f8f6f3" : "#2a2622",
+                  opacity: loadingPlan !== null ? 0.7 : 1,
+                  transition: "all 0.15s",
+                }}
               >
-                <button
-                  style={{
-                    width: "100%",
-                    padding: "11px",
-                    borderRadius: "10px",
-                    border: "none",
-                    fontSize: "13px",
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    background: plan.highlighted ? "#2a2622" : "#eae4de",
-                    color: plan.highlighted ? "#f8f6f3" : "#2a2622",
-                    transition: "all 0.15s",
-                  }}
-                >
-                  Subscribe to {plan.label}
-                </button>
-              </CheckoutButton>
+                {loadingPlan === plan.id ? "Redirecting to Stripe…" : `Subscribe to ${plan.label}`}
+              </button>
             </div>
           ))}
         </div>

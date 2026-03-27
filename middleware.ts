@@ -1,49 +1,72 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
-import { NextResponse } from "next/server"
-import type { UserMetadata } from "@/lib/planConfig"
+import { createServerClient } from "@supabase/ssr"
+import { NextResponse, type NextRequest } from "next/server"
 import { isTrialActive, hasPaidPlan } from "@/lib/planConfig"
 
-const isPublicRoute = createRouteMatcher([
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-  "/api/(.*)",
-])
+// Paths that never require auth
+const PUBLIC_PREFIXES = ["/sign-in", "/sign-up", "/auth/callback", "/api/"]
 
-// Routes that authenticated users can access regardless of onboarding/trial state
-const isAuthGatedRoute = createRouteMatcher([
-  "/onboarding(.*)",
-  "/upgrade(.*)",
-])
+// Paths that require auth but skip the onboarding/trial gates
+const AUTH_GATED_PREFIXES = ["/onboarding", "/upgrade"]
 
-export default clerkMiddleware(async (auth, request) => {
-  // Always allow public routes through without auth check
-  if (isPublicRoute(request)) return
+export async function middleware(request: NextRequest) {
+  // Build a mutable response so the Supabase client can refresh the session cookie
+  let supabaseResponse = NextResponse.next({ request })
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          supabaseResponse = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
+
+  // Refresh session — must be called before any auth checks
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const path = request.nextUrl.pathname
+
+  // Always allow public paths and API routes
+  if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) {
+    return supabaseResponse
+  }
 
   // Require sign-in for everything else
-  const { userId, sessionClaims, has } = await auth.protect()
+  if (!user) {
+    return NextResponse.redirect(new URL("/sign-in", request.url))
+  }
 
-  if (!userId) return
-
-  const meta = ((sessionClaims?.publicMetadata ?? {}) as UserMetadata)
-
-  // Routes like /onboarding and /upgrade are accessible once signed in —
-  // skip the deeper checks so users can always reach them
-  if (isAuthGatedRoute(request)) return
+  // Onboarding + upgrade are accessible once signed in — no deeper checks
+  if (AUTH_GATED_PREFIXES.some((p) => path.startsWith(p))) {
+    return supabaseResponse
+  }
 
   // --- Onboarding gate ---
-  // New users (trial or paid) must complete onboarding before accessing the app
+  // app_metadata is in the JWT — no DB call needed
+  const meta = user.app_metadata ?? {}
   if (!meta.onboarding_complete) {
     return NextResponse.redirect(new URL("/onboarding", request.url))
   }
 
   // --- Access gate ---
-  // After onboarding, user needs either an active paid plan or an active trial
-  const canAccess = hasPaidPlan(has) || isTrialActive(meta.trial_ends_at)
+  // User needs either an active paid plan or an active trial
+  const canAccess = hasPaidPlan(meta.plan_tier) || isTrialActive(meta.trial_ends_at)
   if (!canAccess) {
-    // Trial has expired and no paid plan — send to upgrade
     return NextResponse.redirect(new URL("/upgrade", request.url))
   }
-})
+
+  return supabaseResponse
+}
 
 export const config = {
   matcher: [

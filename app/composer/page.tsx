@@ -1,6 +1,7 @@
 "use client"
 
-import { SignedIn, SignedOut, UserButton, useAuth } from "@clerk/nextjs"
+import { useCurrentUser } from "@/hooks/useCurrentUser"
+import { createClient } from "@/lib/supabase/client"
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react"
 import { getAllVoices, VoiceDefinition } from "@/lib/voiceData"
 import { getPlanConfig, remainingGenerations, resolvePlanId, hasPaidPlan } from "@/lib/planConfig"
@@ -122,21 +123,11 @@ function assembleSegments(paragraphs: Paragraph[], defaultIntent: string): Array
 }
 
 // ---------------------------------------------------------------------------
-// Page — Clerk gate
+// Page
 // ---------------------------------------------------------------------------
 
 export default function ComposerPage() {
-  return (
-    <>
-      <SignedIn><Composer /></SignedIn>
-      <SignedOut><FramerRedirect /></SignedOut>
-    </>
-  )
-}
-
-function FramerRedirect() {
-  useEffect(() => { window.location.replace(MARKETING_URL) }, [])
-  return null
+  return <Composer />
 }
 
 function NoPlanWall() {
@@ -144,12 +135,38 @@ function NoPlanWall() {
   return null
 }
 
+function SignOutButton() {
+  async function handleSignOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    window.location.replace(MARKETING_URL)
+  }
+  return (
+    <button
+      onClick={handleSignOut}
+      style={{
+        background: "none", border: "none", cursor: "pointer",
+        width: "28px", height: "28px", borderRadius: "50%",
+        background: "#eae4de", display: "flex", alignItems: "center",
+        justifyContent: "center", flexShrink: 0,
+      }}
+      title="Sign out"
+    >
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#756d65" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+        <polyline points="16 17 21 12 16 7"/>
+        <line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+    </button>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Composer — main app
 // ---------------------------------------------------------------------------
 
 function Composer() {
-  const { has, isLoaded } = useAuth()
+  const { plan: planTier, isLoaded } = useCurrentUser()
   const voices = getAllVoices()
 
   // Voice & variant
@@ -217,7 +234,7 @@ function Composer() {
   // Plan
   // ---------------------------------------------------------------------------
 
-  const plan = getPlanConfig(isLoaded ? resolvePlanId(has) : undefined)
+  const plan = getPlanConfig(isLoaded ? resolvePlanId(planTier) : undefined)
   const remaining = remainingGenerations(plan, usedToday)
   const isAtLimit = remaining !== null && remaining <= 0
 
@@ -590,7 +607,7 @@ function Composer() {
   }
 
   // No-plan gate — after all hooks
-  if (isLoaded && !hasPaidPlan(has)) return <NoPlanWall />
+  if (isLoaded && !hasPaidPlan(planTier)) return <NoPlanWall />
 
   // ---------------------------------------------------------------------------
   // Render
@@ -664,7 +681,7 @@ function Composer() {
               </span>
             </>
           )}
-          <UserButton afterSignOutUrl={MARKETING_URL} />
+          <SignOutButton />
         </div>
       </header>
 

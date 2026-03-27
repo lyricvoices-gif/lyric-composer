@@ -1,20 +1,19 @@
 /**
  * app/api/onboarding/route.ts
  * Marks the user's onboarding complete and persists their voice/variant choices
- * to Clerk publicMetadata. Called from the /onboarding client flow.
- *
- * Only touches the four onboarding fields — existing metadata (plan, trial_ends_at)
- * is preserved via Clerk's merge behavior on updateUserMetadata.
+ * to Supabase app_metadata. Called from the /onboarding client flow.
  */
 
-import { auth, clerkClient } from "@clerk/nextjs/server"
-import type { UserMetadata } from "@/lib/planConfig"
+import { createClient } from "@/lib/supabase/server"
+import { supabaseAdmin } from "@/lib/supabase/admin"
+import { neon } from "@neondatabase/serverless"
 import { getAllVoices } from "@/lib/voiceData"
 import type { VoiceId } from "@/lib/voiceData"
 
 export async function POST(req: Request): Promise<Response> {
-  const { userId } = await auth()
-  if (!userId) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
     return Response.json({ error: "Unauthorized" }, { status: 401 })
   }
 
@@ -47,15 +46,37 @@ export async function POST(req: Request): Promise<Response> {
     )
   }
 
-  const clerk = await clerkClient()
-  await clerk.users.updateUserMetadata(userId, {
-    publicMetadata: {
+  // Write to app_metadata (merges with existing — trial_ends_at is preserved)
+  const { error: metaError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+    app_metadata: {
       onboarding_complete: true,
       onboarding_voice: voice,
       onboarding_variant: variant,
       onboarding_intent: intent,
-    } satisfies Partial<UserMetadata>,
+    },
   })
+
+  if (metaError) {
+    console.error("[api/onboarding] Failed to update app_metadata:", metaError)
+    return Response.json({ error: "Failed to save onboarding" }, { status: 500 })
+  }
+
+  // Mirror to user_profiles for analytics / reporting
+  try {
+    const sql = neon(process.env.DATABASE_URL!)
+    await sql`
+      UPDATE user_profiles
+      SET
+        onboarding_complete = true,
+        onboarding_voice    = ${voice},
+        onboarding_variant  = ${variant},
+        onboarding_intent   = ${intent}
+      WHERE user_id = ${user.id}
+    `
+  } catch (err) {
+    console.error("[api/onboarding] Failed to mirror to user_profiles:", err)
+    // Non-fatal — app_metadata is the source of truth
+  }
 
   return Response.json({ ok: true })
 }

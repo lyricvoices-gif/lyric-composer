@@ -2,15 +2,15 @@
  * lib/planConfig.ts
  * Plan tier definitions and limit enforcement for Lyric Composer.
  *
- * Plans are resolved via Clerk Billing using the has() checker from auth().
+ * Plans are resolved from Supabase app_metadata.plan_tier (set server-side only).
  * Falls back to "creator" (lowest paid tier) if no plan is assigned.
- * There is no free tier in the Next.js app — the Framer mini composer handles that.
+ * There is no free tier in the Next.js app — the mini composer on the marketing site handles that.
  *
  * Trial flow:
- * - 7-day trial, credit card required at signup (configured in Clerk Dashboard)
- * - Auto-charges to Creator ($29/mo) at day 7
- * - trial_ends_at written to publicMetadata by the Clerk webhook on user.created
+ * - 7-day free trial, no credit card required
+ * - trial_ends_at written to app_metadata + user_profiles by auth/callback on first sign-in
  * - Trial users get Creator-level limits
+ * - After trial expires, user is redirected to /upgrade
  */
 
 // ---------------------------------------------------------------------------
@@ -20,13 +20,13 @@
 export type PlanId = "creator" | "studio" | "enterprise"
 
 /**
- * Shape of Clerk publicMetadata for Lyric users.
- * Written server-side only (never from the client).
+ * Shape of Supabase app_metadata for Lyric users.
+ * Written server-side only via the admin client (never from the client).
  */
 export interface UserMetadata {
-  /** Active Clerk Billing plan ID. Absent during trial. */
-  plan?: PlanId
-  /** ISO 8601 datetime string. Set at signup, cleared once paid plan activates. */
+  /** Active plan tier. Absent during trial. */
+  plan_tier?: PlanId
+  /** ISO 8601 datetime string. Set at first sign-in. */
   trial_ends_at?: string
   /** True once the user has completed the /onboarding flow. */
   onboarding_complete?: boolean
@@ -115,20 +115,13 @@ export function remainingGenerations(
 }
 
 /**
- * Resolves the active PlanId from Clerk Billing using the has() checker.
- * Checks tiers in descending order (enterprise → studio → creator) so the
- * highest-entitled plan always wins.
- * Falls back to "creator" if the user has no plan assigned yet.
- *
- * Server usage:  const { has } = await auth()
- * Client usage:  const { has } = useAuth()
+ * Resolves the active PlanId from the plan_tier string (from app_metadata or DB).
+ * Checks tiers in descending order so the highest-entitled plan always wins.
+ * Falls back to "creator" if no plan is assigned.
  */
-export function resolvePlanId(
-  has: (params: { plan: string }) => boolean
-): PlanId {
-  if (has({ plan: "enterprise" })) return "enterprise"
-  if (has({ plan: "studio" })) return "studio"
-  if (has({ plan: "creator" })) return "creator"
+export function resolvePlanId(planTier: string | null | undefined): PlanId {
+  if (planTier === "enterprise") return "enterprise"
+  if (planTier === "studio") return "studio"
   return "creator"
 }
 
@@ -136,10 +129,8 @@ export function resolvePlanId(
  * Returns true if the user holds any paid plan.
  * Used to gate access to the composer for authenticated-but-unpaid users.
  */
-export function hasPaidPlan(
-  has: (params: { plan: string }) => boolean
-): boolean {
-  return has({ plan: "enterprise" }) || has({ plan: "studio" }) || has({ plan: "creator" })
+export function hasPaidPlan(planTier: string | null | undefined): boolean {
+  return planTier === "enterprise" || planTier === "studio" || planTier === "creator"
 }
 
 // ---------------------------------------------------------------------------
@@ -176,8 +167,8 @@ export function trialDaysRemaining(trialEndsAt: string | null | undefined): numb
  * either they have an active paid plan, or they are within their trial window.
  */
 export function hasComposerAccess(
-  has: (params: { plan: string }) => boolean,
+  planTier: string | null | undefined,
   trialEndsAt?: string | null
 ): boolean {
-  return hasPaidPlan(has) || isTrialActive(trialEndsAt)
+  return hasPaidPlan(planTier) || isTrialActive(trialEndsAt)
 }
