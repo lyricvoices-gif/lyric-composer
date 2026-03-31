@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter, useSearchParams } from "next/navigation"
+import Wordmark from "@/components/Wordmark"
 
 const MARKETING_URL = "https://lyricvoices.ai"
 
@@ -159,14 +160,8 @@ export default function UpgradePage() {
           display: "flex", alignItems: "center",
           borderBottom: `1px solid ${BORDER}`,
         }}>
-          <a href={MARKETING_URL} style={{ textDecoration: "none" }}>
-            <span style={{
-              fontSize: "11px", fontWeight: 700,
-              letterSpacing: "0.2em", color: LIGHT,
-              textTransform: "uppercase",
-            }}>
-              Lyric
-            </span>
+          <a href={MARKETING_URL} style={{ textDecoration: "none", display: "flex", alignItems: "center" }}>
+            <Wordmark height={14} color={LIGHT} />
           </a>
         </header>
 
