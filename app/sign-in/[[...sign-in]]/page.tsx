@@ -130,7 +130,7 @@ export default function SignInPage() {
           gap: "32px",
         }}>
           {/* Wordmark */}
-          <Wordmark height={22} color={LIGHT} />
+          <Wordmark height={32} color={LIGHT} />
 
           {/* Heading */}
           <div style={{ textAlign: "center" }}>
