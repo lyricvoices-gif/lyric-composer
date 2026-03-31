@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { Suspense, useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter, useSearchParams } from "next/navigation"
 import Wordmark from "@/components/Wordmark"
@@ -28,6 +28,16 @@ const TOAST_MESSAGES: Record<string, string> = {
 }
 
 export default function UpgradePage() {
+  return (
+    <Suspense fallback={
+      <div style={{ minHeight: "100vh", background: "#2b2a25" }} />
+    }>
+      <UpgradeContent />
+    </Suspense>
+  )
+}
+
+function UpgradeContent() {
   const [loading, setLoading] = useState(false)
   const [hasAccount, setHasAccount] = useState(false)
   const [showPlans, setShowPlans] = useState(false)
