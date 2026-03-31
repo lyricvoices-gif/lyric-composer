@@ -15,8 +15,20 @@ const INPUT_BG = "rgba(255,255,255,0.06)"
 
 type Step = "input" | "otp"
 
+// Detects phone: starts with "+", or is mostly digits (7+ digits after stripping formatting)
 function isPhoneInput(value: string): boolean {
-  return value.trimStart().startsWith("+")
+  const trimmed = value.trim()
+  if (trimmed.startsWith("+")) return true
+  const digitsOnly = trimmed.replace(/[\s\-().]/g, "")
+  return /^\d{7,15}$/.test(digitsOnly)
+}
+
+// Normalise phone for Supabase: ensure it starts with +, default to +1 (US)
+function normalisePhone(value: string): string {
+  const trimmed = value.trim()
+  if (trimmed.startsWith("+")) return trimmed
+  const digitsOnly = trimmed.replace(/[\s\-().]/g, "")
+  return `+1${digitsOnly}`
 }
 
 export default function SignInPage() {
@@ -59,7 +71,7 @@ export default function SignInPage() {
     const supabase = createClient()
 
     const otpPayload = isPhone
-      ? { phone: value, options: { shouldCreateUser: true } }
+      ? { phone: normalisePhone(value), options: { shouldCreateUser: true } }
       : { email: value, options: { shouldCreateUser: true } }
 
     const { error: otpError } = await supabase.auth.signInWithOtp(otpPayload)
@@ -80,7 +92,7 @@ export default function SignInPage() {
 
     const value = credential.trim()
     const verifyPayload = isPhone
-      ? { phone: value, token: otp, type: "sms" as const }
+      ? { phone: normalisePhone(value), token: otp, type: "sms" as const }
       : { email: value, token: otp, type: "email" as const }
 
     const { error: verifyError } = await supabase.auth.verifyOtp(verifyPayload)
@@ -196,9 +208,9 @@ export default function SignInPage() {
                     boxSizing: "border-box",
                   }}
                 />
-                {isPhone && (
+                {isPhone && !credential.trim().startsWith("+") && (
                   <p style={{ fontSize: "11px", color: MUTED, margin: 0, lineHeight: 1.4 }}>
-                    Include country code (e.g. +1 for US)
+                    US number detected. We will send your code to +1{credential.trim().replace(/[\s\-().]/g, "")}
                   </p>
                 )}
                 <button
