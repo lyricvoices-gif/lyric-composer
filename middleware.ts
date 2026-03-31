@@ -57,7 +57,10 @@ export async function middleware(request: NextRequest) {
   // 1. Payment gate — user needs an active paid plan or an active trial
   const canAccess = hasPaidPlan(meta.plan_tier) || isTrialActive(meta.trial_ends_at)
   if (!canAccess) {
-    return NextResponse.redirect(new URL("/upgrade", request.url))
+    // Determine the reason so the upgrade page can show context
+    const hadPlanBefore = meta.plan_tier === "expired" || meta.trial_ends_at
+    const reason = hadPlanBefore ? "expired" : "no_plan"
+    return NextResponse.redirect(new URL(`/upgrade?reason=${reason}`, request.url))
   }
 
   // 2. Onboarding gate — user needs to complete voice/variant selection

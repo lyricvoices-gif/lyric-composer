@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 
 const MARKETING_URL = "https://lyricvoices.ai"
 
@@ -21,11 +21,19 @@ const FEATURES = [
   "History and auto-save",
 ]
 
+const TOAST_MESSAGES: Record<string, string> = {
+  expired: "Your trial or subscription has ended. Choose a plan to continue using the composer.",
+  no_plan: "Select a plan to get started with the composer.",
+}
+
 export default function UpgradePage() {
   const [loading, setLoading] = useState(false)
   const [hasAccount, setHasAccount] = useState(false)
   const [showPlans, setShowPlans] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
+  const [toastVisible, setToastVisible] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   // Check auth state
   useEffect(() => {
@@ -38,6 +46,22 @@ export default function UpgradePage() {
       }
     })
   }, [router])
+
+  // Show toast if reason param is present
+  useEffect(() => {
+    const reason = searchParams.get("reason")
+    if (reason && TOAST_MESSAGES[reason]) {
+      setToast(TOAST_MESSAGES[reason])
+      // Animate in
+      requestAnimationFrame(() => setToastVisible(true))
+      // Auto-dismiss after 6 seconds
+      const timer = setTimeout(() => {
+        setToastVisible(false)
+        setTimeout(() => setToast(null), 300)
+      }, 6000)
+      return () => clearTimeout(timer)
+    }
+  }, [searchParams])
 
   async function handleStartTrial() {
     setLoading(true)
@@ -90,6 +114,10 @@ export default function UpgradePage() {
         .upgrade-btn:not(:disabled):hover { opacity: 0.9 !important; }
         .plan-toggle { transition: color 0.15s; }
         .plan-toggle:hover { color: ${LIGHT} !important; }
+        @keyframes toast-in {
+          from { opacity: 0; transform: translateY(-8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
       `}</style>
 
       <div style={{
@@ -98,6 +126,33 @@ export default function UpgradePage() {
         flexDirection: "column",
         background: DARK,
       }}>
+        {/* Toast */}
+        {toast && (
+          <div style={{
+            position: "fixed",
+            top: "20px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 100,
+            maxWidth: "480px",
+            width: "calc(100% - 48px)",
+            padding: "14px 20px",
+            borderRadius: "12px",
+            background: "rgba(43,42,37,0.95)",
+            border: `1px solid rgba(201,169,110,0.25)`,
+            backdropFilter: "blur(16px)",
+            color: LIGHT,
+            fontSize: "13px",
+            lineHeight: 1.5,
+            textAlign: "center",
+            opacity: toastVisible ? 1 : 0,
+            transition: "opacity 0.3s ease",
+            animation: toastVisible ? "toast-in 0.3s ease" : "none",
+          }}>
+            {toast}
+          </div>
+        )}
+
         {/* Topbar */}
         <header style={{
           height: "52px", padding: "0 24px",
@@ -133,7 +188,9 @@ export default function UpgradePage() {
                 letterSpacing: "-0.02em", color: LIGHT,
                 margin: "0 0 12px",
               }}>
-                Start your free trial
+                {searchParams.get("reason") === "expired"
+                  ? "Welcome back"
+                  : "Start your free trial"}
               </h1>
               <p style={{
                 fontSize: "14px", color: MUTED,
