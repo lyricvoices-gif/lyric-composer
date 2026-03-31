@@ -5,8 +5,8 @@ import { isTrialActive, hasPaidPlan } from "@/lib/planConfig"
 // Paths that never require auth
 const PUBLIC_PREFIXES = ["/sign-in", "/sign-up", "/auth/callback", "/api/"]
 
-// Paths that require auth but skip the onboarding/trial gates
-const AUTH_GATED_PREFIXES = ["/onboarding", "/upgrade"]
+// Paths that require auth but skip the payment/onboarding gates
+const AUTH_GATED_PREFIXES = ["/upgrade", "/onboarding"]
 
 export async function middleware(request: NextRequest) {
   // Build a mutable response so the Supabase client can refresh the session cookie
@@ -46,23 +46,23 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/sign-in", request.url))
   }
 
-  // Onboarding + upgrade are accessible once signed in — no deeper checks
+  // Upgrade + onboarding are accessible once signed in — no deeper checks
   if (AUTH_GATED_PREFIXES.some((p) => path.startsWith(p))) {
     return supabaseResponse
   }
 
-  // --- Onboarding gate ---
-  // app_metadata is in the JWT — no DB call needed
+  // --- Gate order: payment THEN onboarding ---
   const meta = user.app_metadata ?? {}
-  if (!meta.onboarding_complete) {
-    return NextResponse.redirect(new URL("/onboarding", request.url))
-  }
 
-  // --- Access gate ---
-  // User needs either an active paid plan or an active trial
+  // 1. Payment gate — user needs an active paid plan or an active trial
   const canAccess = hasPaidPlan(meta.plan_tier) || isTrialActive(meta.trial_ends_at)
   if (!canAccess) {
     return NextResponse.redirect(new URL("/upgrade", request.url))
+  }
+
+  // 2. Onboarding gate — user needs to complete voice/variant selection
+  if (!meta.onboarding_complete) {
+    return NextResponse.redirect(new URL("/onboarding", request.url))
   }
 
   return supabaseResponse

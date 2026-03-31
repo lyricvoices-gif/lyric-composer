@@ -7,10 +7,12 @@
  * There is no free tier in the Next.js app — the mini composer on the marketing site handles that.
  *
  * Trial flow:
- * - 7-day free trial, no credit card required
- * - trial_ends_at written to app_metadata + user_profiles by auth/callback on first sign-in
- * - Trial users get Creator-level limits
- * - After trial expires, user is redirected to /upgrade
+ * - 7-day free trial, credit card required at signup (captured via Stripe Checkout)
+ * - User selects Creator ($29/mo) or Studio ($99/mo) with trial_period_days: 7
+ * - Auto-charges at day 7 unless cancelled
+ * - trial_ends_at + plan_tier written to app_metadata by Stripe webhook on checkout.session.completed
+ * - Trial users get limits matching their selected plan tier
+ * - After trial expires or subscription cancelled, user is redirected to /upgrade
  */
 
 // ---------------------------------------------------------------------------

@@ -3,7 +3,7 @@
  * Handles Stripe webhook events for subscription lifecycle management.
  *
  * Registered events:
- *   checkout.session.completed    — activate paid plan
+ *   checkout.session.completed    — activate paid plan (+ set trial_ends_at if trial)
  *   customer.subscription.deleted — deactivate plan on cancellation
  *
  * Required env vars:
@@ -11,7 +11,7 @@
  *   STRIPE_WEBHOOK_SECRET    — from Stripe Dashboard → Webhooks → Signing Secret
  *
  * Setup in Stripe Dashboard:
- *   Webhooks → Add endpoint → https://composer.lyricvoices.ai/api/webhooks/stripe
+ *   Webhooks → Add endpoint → https://composer.lyricvoices.com/api/webhooks/stripe
  *   Subscribe to: checkout.session.completed, customer.subscription.deleted
  */
 
@@ -19,16 +19,16 @@ import { headers } from "next/headers"
 import Stripe from "stripe"
 import { neon } from "@neondatabase/serverless"
 import { supabaseAdmin } from "@/lib/supabase/admin"
+import {
+  sendTrialWelcome,
+  scheduleTrialNudge,
+  scheduleTrialConversion,
+} from "@/lib/email"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
 function db() {
   return neon(process.env.DATABASE_URL!)
-}
-
-const PRICE_TO_PLAN: Record<string, string> = {
-  [process.env.STRIPE_PRICE_CREATOR!]: "creator",
-  [process.env.STRIPE_PRICE_STUDIO!]:  "studio",
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -57,13 +57,48 @@ export async function POST(req: Request): Promise<Response> {
     const session = event.data.object as Stripe.Checkout.Session
     const userId = session.metadata?.supabase_user_id
     const planId = session.metadata?.plan_id
+    const isTrial = session.metadata?.is_trial === "true"
 
     if (!userId || !planId) {
       console.error("[webhook/stripe] Missing metadata on session:", session.id)
       return Response.json({ received: true })
     }
 
-    await activatePlan(userId, planId)
+    // Calculate trial_ends_at if this is a trial checkout
+    let trialEndsAt: string | null = null
+    if (isTrial) {
+      const trialEnd = new Date()
+      trialEnd.setDate(trialEnd.getDate() + 7)
+      trialEndsAt = trialEnd.toISOString()
+    }
+
+    await activatePlan(userId, planId, trialEndsAt)
+
+    // Send trial email sequence if this is a trial start
+    if (isTrial && trialEndsAt) {
+      // Look up user email for the email sequence
+      try {
+        const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(userId)
+        if (user) {
+          const email = user.email ?? (user.user_metadata?.email as string | undefined) ?? ""
+          const firstName =
+            (user.user_metadata?.full_name as string | undefined)?.split(" ")[0] ??
+            (user.user_metadata?.name as string | undefined)?.split(" ")[0] ??
+            undefined
+
+          if (email) {
+            const emailParams = { to: email, firstName, trialEndsAt: new Date(trialEndsAt) }
+            Promise.allSettled([
+              sendTrialWelcome(emailParams),
+              scheduleTrialNudge(emailParams),
+              scheduleTrialConversion(emailParams),
+            ]).catch(() => {})
+          }
+        }
+      } catch (err) {
+        console.error("[webhook/stripe] Failed to send trial emails:", err)
+      }
+    }
   }
 
   // ── customer.subscription.deleted — deactivate plan ───────────────────────
@@ -94,10 +129,20 @@ export async function POST(req: Request): Promise<Response> {
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function activatePlan(userId: string, planId: string): Promise<void> {
+async function activatePlan(
+  userId: string,
+  planId: string,
+  trialEndsAt: string | null,
+): Promise<void> {
+  // Build app_metadata update
+  const metadataUpdate: Record<string, unknown> = { plan_tier: planId }
+  if (trialEndsAt) {
+    metadataUpdate.trial_ends_at = trialEndsAt
+  }
+
   try {
     await supabaseAdmin.auth.admin.updateUserById(userId, {
-      app_metadata: { plan_tier: planId },
+      app_metadata: metadataUpdate,
     })
   } catch (err) {
     console.error("[webhook/stripe] Failed to update app_metadata:", err)
@@ -105,11 +150,20 @@ async function activatePlan(userId: string, planId: string): Promise<void> {
 
   try {
     const sql = db()
-    await sql`
-      UPDATE user_profiles
-      SET plan_tier = ${planId}
-      WHERE user_id = ${userId}
-    `
+    if (trialEndsAt) {
+      await sql`
+        UPDATE user_profiles
+        SET plan_tier = ${planId},
+            trial_ends_at = ${trialEndsAt}
+        WHERE user_id = ${userId}
+      `
+    } else {
+      await sql`
+        UPDATE user_profiles
+        SET plan_tier = ${planId}
+        WHERE user_id = ${userId}
+      `
+    }
   } catch (err) {
     console.error("[webhook/stripe] Failed to update user_profiles:", err)
   }

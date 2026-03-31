@@ -32,7 +32,7 @@ const VARIANT_TAGLINES: Record<string, Record<string, string>> = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function OnboardingFlow() {
+export default function OnboardingFlow({ isRevisit = false }: { isRevisit?: boolean }) {
   const router = useRouter()
   const voices = getAllVoices()
 
@@ -85,8 +85,6 @@ export default function OnboardingFlow() {
           intent: selectedVariant,
         }),
       })
-      // Push to /onboarding — the server wrapper calls currentUser() (always fresh)
-      // and redirects to /composer once it sees onboarding_complete: true.
       router.push("/composer")
     } catch {
       setIsSubmitting(false)
@@ -364,7 +362,7 @@ export default function OnboardingFlow() {
                 marginBottom: "16px",
               }}
             >
-              {isSubmitting ? "Launching…" : "Enter the composer →"}
+              {isSubmitting ? "Launching\u2026" : isRevisit ? "Update and return \u2192" : "Enter the composer \u2192"}
             </button>
 
             <button

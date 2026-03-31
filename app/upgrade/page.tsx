@@ -1,53 +1,67 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
 const MARKETING_URL = "https://lyricvoices.ai"
 
-const PLANS = [
-  {
-    id: "creator",
-    label: "Creator",
-    price: "$29",
-    period: "month",
-    features: [
-      "25 generations / day",
-      "500 characters per script",
-      "All 5 voices",
-      "History & auto-save",
-    ],
-    highlighted: false,
-  },
-  {
-    id: "studio",
-    label: "Studio",
-    price: "$99",
-    period: "month",
-    features: [
-      "100 generations / day",
-      "2,000 characters per script",
-      "All 5 voices",
-      "History & auto-save",
-      "Projects (coming soon)",
-    ],
-    highlighted: true,
-  },
-] as const
+// ── Design tokens ────────────────────────────────────────────────────────────
+const DARK = "#2b2a25"
+const LIGHT = "#f5f3ef"
+const GOLD = "#c9a96e"
+const MUTED = "rgba(245,243,239,0.45)"
+const BORDER = "rgba(255,255,255,0.08)"
+
+const FEATURES = [
+  "25 generations per day",
+  "500 characters per script",
+  "All 5 voices and tonal variants",
+  "Inline direction marks",
+  "History and auto-save",
+]
 
 export default function UpgradePage() {
-  const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [hasAccount, setHasAccount] = useState(false)
+  const [showPlans, setShowPlans] = useState(false)
   const router = useRouter()
 
-  // Guard: redirect to sign-in if no session
-  const supabase = createClient()
-  supabase.auth.getUser().then(({ data: { user } }) => {
-    if (!user) router.replace("/sign-in")
-  })
+  // Check auth state
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) {
+        router.replace("/sign-up")
+      } else {
+        setHasAccount(true)
+      }
+    })
+  }, [router])
 
-  async function handleCheckout(planId: string) {
-    setLoadingPlan(planId)
+  async function handleStartTrial() {
+    setLoading(true)
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId: "creator", trial: true }),
+      })
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        console.error("[upgrade] No checkout URL:", data)
+        setLoading(false)
+      }
+    } catch (err) {
+      console.error("[upgrade] Checkout error:", err)
+      setLoading(false)
+    }
+  }
+
+  async function handleSubscribe(planId: string) {
+    setLoading(true)
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
@@ -59,120 +73,233 @@ export default function UpgradePage() {
         window.location.href = data.url
       } else {
         console.error("[upgrade] No checkout URL:", data)
-        setLoadingPlan(null)
+        setLoading(false)
       }
     } catch (err) {
       console.error("[upgrade] Checkout error:", err)
-      setLoadingPlan(null)
+      setLoading(false)
     }
   }
 
+  if (!hasAccount) return null
+
   return (
-    <div style={{ minHeight: "100vh", background: "#f8f6f3", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+    <>
+      <style>{`
+        .upgrade-btn { transition: all 0.15s; }
+        .upgrade-btn:not(:disabled):hover { opacity: 0.9 !important; }
+        .plan-toggle { transition: color 0.15s; }
+        .plan-toggle:hover { color: ${LIGHT} !important; }
+      `}</style>
 
-      {/* Topbar */}
-      <header style={{
-        height: "52px", padding: "0 24px",
-        display: "flex", alignItems: "center",
-        borderBottom: "1px solid #eae4de",
-        background: "rgba(248,246,243,0.96)",
+      <div style={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        background: DARK,
       }}>
-        <a href={MARKETING_URL} style={{ textDecoration: "none" }}>
-          <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.2em", color: "#2a2622", textTransform: "uppercase" }}>
-            Lyric
-          </span>
-        </a>
-      </header>
+        {/* Topbar */}
+        <header style={{
+          height: "52px", padding: "0 24px",
+          display: "flex", alignItems: "center",
+          borderBottom: `1px solid ${BORDER}`,
+        }}>
+          <a href={MARKETING_URL} style={{ textDecoration: "none" }}>
+            <span style={{
+              fontSize: "11px", fontWeight: 700,
+              letterSpacing: "0.2em", color: LIGHT,
+              textTransform: "uppercase",
+            }}>
+              Lyric
+            </span>
+          </a>
+        </header>
 
-      {/* Main */}
-      <main style={{ maxWidth: "720px", margin: "0 auto", padding: "64px 24px" }}>
+        {/* Main */}
+        <main style={{
+          flex: 1, display: "flex",
+          alignItems: "center", justifyContent: "center",
+          padding: "48px 24px",
+        }}>
+          <div style={{
+            width: "100%", maxWidth: "420px",
+            display: "flex", flexDirection: "column",
+            alignItems: "center", gap: "32px",
+          }}>
+            {/* Heading */}
+            <div style={{ textAlign: "center" }}>
+              <h1 style={{
+                fontSize: "24px", fontWeight: 600,
+                letterSpacing: "-0.02em", color: LIGHT,
+                margin: "0 0 12px",
+              }}>
+                Start your free trial
+              </h1>
+              <p style={{
+                fontSize: "14px", color: MUTED,
+                lineHeight: 1.6, margin: 0,
+              }}>
+                7 days free on the Creator plan. $29/mo after.
+                <br />
+                Cancel anytime before your trial ends.
+              </p>
+            </div>
 
-        {/* Heading */}
-        <div style={{ textAlign: "center", marginBottom: "48px" }}>
-          <h1 style={{ fontSize: "24px", fontWeight: 600, letterSpacing: "-0.02em", color: "#2a2622", margin: "0 0 12px" }}>
-            Choose your plan
-          </h1>
-          <p style={{ fontSize: "14px", color: "#756d65", lineHeight: 1.6, margin: 0 }}>
-            All plans include access to all 5 voices, history, and auto-save.
-          </p>
-        </div>
-
-        {/* Plan cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-          {PLANS.map((plan) => (
-            <div
-              key={plan.id}
-              style={{
-                background: "#ffffff",
-                border: `1.5px solid ${plan.highlighted ? "#c4977f" : "#eae4de"}`,
-                borderRadius: "16px",
-                padding: "28px 24px",
-                display: "flex",
-                flexDirection: "column",
-                gap: "20px",
-                boxShadow: plan.highlighted ? "0 2px 16px rgba(196,151,127,0.15)" : "none",
-              }}
-            >
-              {/* Plan name + price */}
-              <div>
-                <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.15em", color: "#b5aca3", textTransform: "uppercase", margin: "0 0 8px" }}>
-                  {plan.label}
-                </p>
-                <p style={{ fontSize: "28px", fontWeight: 600, color: "#2a2622", letterSpacing: "-0.02em", margin: 0, lineHeight: 1 }}>
-                  {plan.price}
-                  <span style={{ fontSize: "13px", fontWeight: 400, color: "#9c958f", marginLeft: "4px" }}>
-                    / {plan.period}
-                  </span>
-                </p>
-              </div>
-
-              {/* Features */}
-              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "8px", flex: 1 }}>
-                {plan.features.map((feature) => (
+            {/* Feature list */}
+            <div style={{
+              width: "100%",
+              background: "rgba(255,255,255,0.04)",
+              border: `1px solid ${BORDER}`,
+              borderRadius: "14px",
+              padding: "24px 28px",
+            }}>
+              <p style={{
+                fontSize: "10px", fontWeight: 700,
+                letterSpacing: "0.15em", color: GOLD,
+                textTransform: "uppercase", margin: "0 0 16px",
+              }}>
+                What you get
+              </p>
+              <ul style={{
+                listStyle: "none", padding: 0, margin: 0,
+                display: "flex", flexDirection: "column", gap: "10px",
+              }}>
+                {FEATURES.map((feature) => (
                   <li
                     key={feature}
-                    style={{ fontSize: "13px", color: "#756d65", display: "flex", alignItems: "flex-start", gap: "8px", lineHeight: 1.4 }}
+                    style={{
+                      fontSize: "13px", color: LIGHT,
+                      display: "flex", alignItems: "center",
+                      gap: "10px", lineHeight: 1.4,
+                    }}
                   >
-                    <span style={{ color: "#c4977f", fontSize: "11px", marginTop: "2px", flexShrink: 0 }}>✓</span>
+                    <span style={{ color: GOLD, fontSize: "11px", flexShrink: 0 }}>&#10003;</span>
                     {feature}
                   </li>
                 ))}
               </ul>
+            </div>
 
-              {/* Checkout button */}
+            {/* CTA */}
+            <button
+              className="upgrade-btn"
+              onClick={handleStartTrial}
+              disabled={loading}
+              style={{
+                width: "100%", padding: "14px",
+                borderRadius: "100px", border: "none",
+                background: GOLD,
+                color: DARK,
+                fontSize: "14px", fontWeight: 600,
+                letterSpacing: "-0.01em",
+                cursor: loading ? "not-allowed" : "pointer",
+                opacity: loading ? 0.6 : 1,
+              }}
+            >
+              {loading ? "Redirecting to checkout\u2026" : "Start 7-day free trial"}
+            </button>
+
+            {/* Subscribe directly toggle */}
+            {!showPlans ? (
               <button
-                onClick={() => handleCheckout(plan.id)}
-                disabled={loadingPlan !== null}
+                className="plan-toggle"
+                onClick={() => setShowPlans(true)}
                 style={{
-                  width: "100%",
-                  padding: "11px",
-                  borderRadius: "10px",
-                  border: "none",
-                  fontSize: "13px",
-                  fontWeight: 500,
-                  cursor: loadingPlan !== null ? "not-allowed" : "pointer",
-                  background: plan.highlighted ? "#2a2622" : "#eae4de",
-                  color: plan.highlighted ? "#f8f6f3" : "#2a2622",
-                  opacity: loadingPlan !== null ? 0.7 : 1,
-                  transition: "all 0.15s",
+                  background: "none", border: "none",
+                  color: MUTED, fontSize: "12px",
+                  cursor: "pointer", padding: 0,
                 }}
               >
-                {loadingPlan === plan.id ? "Redirecting to Stripe…" : `Subscribe to ${plan.label}`}
+                Or subscribe directly without a trial
               </button>
-            </div>
-          ))}
-        </div>
+            ) : (
+              <div style={{
+                width: "100%",
+                display: "flex", flexDirection: "column",
+                gap: "10px",
+              }}>
+                <p style={{
+                  fontSize: "11px", color: MUTED,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em", margin: "0 0 4px",
+                  textAlign: "center",
+                }}>
+                  Subscribe now
+                </p>
 
-        {/* Footer */}
-        <p style={{ textAlign: "center", fontSize: "12px", color: "#b5aca3", marginTop: "32px", lineHeight: 1.6 }}>
-          Payments processed securely by Stripe.{" "}
-          Need Enterprise?{" "}
-          <a href="mailto:hello@lyricvoices.ai" style={{ color: "#756d65", textDecoration: "none" }}>
-            Contact us.
-          </a>
-        </p>
+                {/* Creator */}
+                <button
+                  className="upgrade-btn"
+                  onClick={() => handleSubscribe("creator")}
+                  disabled={loading}
+                  style={{
+                    width: "100%", padding: "12px 20px",
+                    borderRadius: "10px",
+                    border: `1px solid ${BORDER}`,
+                    background: "rgba(255,255,255,0.04)",
+                    color: LIGHT,
+                    fontSize: "13px", fontWeight: 500,
+                    cursor: loading ? "not-allowed" : "pointer",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    opacity: loading ? 0.6 : 1,
+                  }}
+                >
+                  <span>Creator</span>
+                  <span style={{ color: MUTED }}>$29 / mo</span>
+                </button>
 
-      </main>
-    </div>
+                {/* Studio */}
+                <button
+                  className="upgrade-btn"
+                  onClick={() => handleSubscribe("studio")}
+                  disabled={loading}
+                  style={{
+                    width: "100%", padding: "12px 20px",
+                    borderRadius: "10px",
+                    border: `1px solid rgba(201,169,110,0.3)`,
+                    background: "rgba(201,169,110,0.06)",
+                    color: LIGHT,
+                    fontSize: "13px", fontWeight: 500,
+                    cursor: loading ? "not-allowed" : "pointer",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    opacity: loading ? 0.6 : 1,
+                  }}
+                >
+                  <span>Studio</span>
+                  <span style={{ color: GOLD }}>$99 / mo</span>
+                </button>
+
+                {/* Enterprise */}
+                <p style={{
+                  fontSize: "12px", color: MUTED,
+                  textAlign: "center", margin: "4px 0 0",
+                  lineHeight: 1.6,
+                }}>
+                  Need Enterprise?{" "}
+                  <a
+                    href="mailto:hello@lyricvoices.ai"
+                    style={{ color: GOLD, textDecoration: "none" }}
+                  >
+                    Contact us
+                  </a>
+                </p>
+              </div>
+            )}
+
+            {/* Stripe footer */}
+            <p style={{
+              fontSize: "11px", color: "rgba(245,243,239,0.2)",
+              textAlign: "center", margin: 0, lineHeight: 1.5,
+            }}>
+              Payments processed securely by Stripe
+            </p>
+          </div>
+        </main>
+      </div>
+    </>
   )
 }

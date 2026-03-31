@@ -2,11 +2,15 @@
  * app/api/checkout/route.ts
  * Creates a Stripe Checkout session for a given plan.
  *
+ * Supports two modes:
+ *   - Trial start:  { planId: "creator", trial: true }  → 7-day free trial, card captured
+ *   - Direct sub:   { planId: "studio" }                → immediate charge
+ *
  * Required env vars:
  *   STRIPE_SECRET_KEY          — from Stripe dashboard
  *   STRIPE_PRICE_CREATOR       — Stripe price ID for Creator ($29/mo)
  *   STRIPE_PRICE_STUDIO        — Stripe price ID for Studio ($99/mo)
- *   NEXT_PUBLIC_APP_URL        — e.g. https://composer.lyricvoices.ai
+ *   NEXT_PUBLIC_APP_URL        — e.g. https://composer.lyricvoices.com
  */
 
 import { createClient } from "@/lib/supabase/server"
@@ -30,7 +34,7 @@ export async function POST(req: Request): Promise<Response> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 })
 
-  let body: { planId: string }
+  let body: { planId: string; trial?: boolean }
   try {
     body = await req.json()
   } catch {
@@ -43,7 +47,8 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const email = user.email ?? (user.user_metadata?.email as string | undefined) ?? ""
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://composer.lyricvoices.ai"
+  const phone = user.phone ?? (user.user_metadata?.phone as string | undefined) ?? ""
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://composer.lyricvoices.com"
 
   // Retrieve or create Stripe customer so subscriptions are linked to one customer record
   const sql = db()
@@ -60,7 +65,8 @@ export async function POST(req: Request): Promise<Response> {
 
   if (!stripeCustomerId) {
     const customer = await stripe.customers.create({
-      email,
+      email: email || undefined,
+      phone: phone || undefined,
       metadata: { supabase_user_id: user.id },
     })
     stripeCustomerId = customer.id
@@ -77,15 +83,33 @@ export async function POST(req: Request): Promise<Response> {
     }
   }
 
-  const session = await stripe.checkout.sessions.create({
+  // Build the checkout session
+  const sessionParams: Stripe.Checkout.SessionCreateParams = {
     customer: stripeCustomerId,
     mode: "subscription",
     payment_method_types: ["card"],
     line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${appUrl}/composer?upgraded=1`,
+    success_url: `${appUrl}/composer?checkout=success`,
     cancel_url:  `${appUrl}/upgrade`,
-    metadata: { supabase_user_id: user.id, plan_id: body.planId },
-  })
+    metadata: {
+      supabase_user_id: user.id,
+      plan_id: body.planId,
+      is_trial: body.trial ? "true" : "false",
+    },
+  }
+
+  // Add 7-day trial if requested
+  if (body.trial) {
+    sessionParams.subscription_data = {
+      trial_period_days: 7,
+      metadata: {
+        supabase_user_id: user.id,
+        plan_id: body.planId,
+      },
+    }
+  }
+
+  const session = await stripe.checkout.sessions.create(sessionParams)
 
   return Response.json({ url: session.url })
 }

@@ -161,6 +161,28 @@ function SignOutButton() {
   )
 }
 
+function TutorialButton() {
+  return (
+    <a
+      href="/onboarding?revisit=1"
+      style={{
+        background: "#eae4de", border: "none", cursor: "pointer",
+        width: "28px", height: "28px", borderRadius: "50%",
+        display: "flex", alignItems: "center",
+        justifyContent: "center", flexShrink: 0,
+        textDecoration: "none",
+      }}
+      title="Voice setup guide"
+    >
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#756d65" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+        <line x1="12" y1="17" x2="12.01" y2="17" />
+      </svg>
+    </a>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Composer — main app
 // ---------------------------------------------------------------------------
@@ -681,6 +703,7 @@ function Composer() {
               </span>
             </>
           )}
+          <TutorialButton />
           <SignOutButton />
         </div>
       </header>
