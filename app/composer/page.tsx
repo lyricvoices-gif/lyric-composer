@@ -209,13 +209,8 @@ function Composer() {
     offsets: { start: number; end: number }
   } | null>(null)
 
-  // Change 2: click-to-open popover (no hover/timeout)
-  const [hoveredVoice, setHoveredVoice] = useState<{
-    voice: VoiceDefinition
-    pillLeft: number
-    pillBottom: number
-  } | null>(null)
-  const voicePopoverRef = useRef<HTMLDivElement>(null)
+  // Floating voice panel
+  const [voicePanelOpen, setVoicePanelOpen] = useState(true)
 
   // Sample audio preview
   const sampleAudioRef = useRef<HTMLAudioElement | null>(null)
@@ -553,17 +548,6 @@ function Composer() {
     }
   }, [audioUrl])
 
-  // Change 2: click-outside closes voice popover
-  useEffect(() => {
-    if (!hoveredVoice) return
-    function onMouseDown(e: MouseEvent) {
-      if (voicePopoverRef.current && !voicePopoverRef.current.contains(e.target as Node)) {
-        setHoveredVoice(null)
-      }
-    }
-    document.addEventListener("mousedown", onMouseDown)
-    return () => document.removeEventListener("mousedown", onMouseDown)
-  }, [hoveredVoice])
 
   // FTU 1 — script tooltip, 1.2s after mount
   useEffect(() => {
@@ -657,6 +641,14 @@ function Composer() {
         .lyric-action-btn-inv:hover:not(:disabled) { background: rgba(248,246,243,0.08) !important; }
         .lyric-toolbar-row { scrollbar-width: none; }
         .lyric-toolbar-row::-webkit-scrollbar { display: none; }
+        .lyric-voice-panel-scroll { scrollbar-width: none; }
+        .lyric-voice-panel-scroll::-webkit-scrollbar { display: none; }
+        .lyric-vp-card { transition: background 0.15s ease; }
+        .lyric-vp-card:hover { background: rgba(234,228,222,0.5) !important; }
+        .lyric-vp-expr { transition: background 0.12s ease; }
+        .lyric-vp-expr:hover { background: #eae4de !important; }
+        .lyric-vp-sample { transition: background 0.12s ease; }
+        .lyric-vp-sample:hover { background: #eae4de !important; }
         .lyric-scrubber { -webkit-appearance: none; appearance: none; height: 3px; border-radius: 2px; background: rgba(248,246,243,0.2); outline: none; cursor: pointer; }
         .lyric-scrubber::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #faf9f7; cursor: pointer; }
         .lyric-scrubber::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #faf9f7; border: none; cursor: pointer; }
@@ -708,72 +700,8 @@ function Composer() {
         </div>
       </header>
 
-      {/* ── Voice toolbar (48px, sticky below top bar) ───────────────────── */}
-      <div style={{
-        position: "sticky", top: "52px", zIndex: 40,
-        height: "48px",
-        background: "rgba(248,246,243,0.96)", backdropFilter: "blur(16px)",
-        borderBottom: "1px solid #eae4de",
-      }}>
-        <div
-          className="lyric-toolbar-row"
-          style={{
-            display: "flex", alignItems: "center", gap: "6px",
-            overflowX: "auto",
-            padding: "0 24px",
-            height: "100%",
-          }}
-        >
-          {/* Change 1: Eyebrow "Voices" */}
-          <span style={{
-            fontSize: "10px", fontWeight: 600, letterSpacing: "0.15em",
-            color: "#b5aca3", textTransform: "uppercase", flexShrink: 0,
-          }}>
-            Voices
-          </span>
-
-          {/* Divider after eyebrow */}
-          <div style={{ width: "1px", height: "20px", background: "#eae4de", flexShrink: 0, margin: "0 2px" }} />
-
-          {/* Change 2: Voice pills — click to toggle popover */}
-          {voices.map((voice) => {
-            const isActive = activeVoice.id === voice.id
-            return (
-              <button
-                key={voice.id}
-                onClick={(e) => {
-                  selectVoice(voice)
-                  const rect = e.currentTarget.getBoundingClientRect()
-                  setHoveredVoice((prev) =>
-                    prev?.voice.id === voice.id ? null : { voice, pillLeft: rect.left, pillBottom: rect.bottom }
-                  )
-                }}
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: "6px",
-                  height: "32px", padding: "0 12px",
-                  borderRadius: "100px",
-                  border: isActive ? "none" : "1px solid #d4cfc9",
-                  background: isActive ? "#2a2622" : "transparent",
-                  color: isActive ? "#faf9f7" : "#756d65",
-                  fontSize: "12px", fontWeight: isActive ? 500 : 400,
-                  cursor: "pointer", flexShrink: 0,
-                  transition: "all 0.12s",
-                }}
-              >
-                <span style={{
-                  width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
-                  background: voice.gradientFrom,
-                  opacity: isActive ? 0.7 : 1,
-                }} />
-                {voice.title}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
       {/* ── Script area ──────────────────────────────────────────────────── */}
-      <main style={{ flex: 1, padding: "0 24px" }}>
+      <main style={{ flex: 1, padding: "0 24px", paddingRight: voicePanelOpen ? "320px" : "24px", transition: "padding-right 0.3s ease" }}>
         <div ref={scriptAreaRef} style={{ maxWidth: "680px", margin: "0 auto", padding: "48px 0 200px" }}>
 
           {/* Action bar */}
@@ -897,78 +825,223 @@ function Composer() {
         </div>
       </main>
 
-      {/* ── Voice popover (fixed, click-to-open) ─────────────────────────── */}
-      {hoveredVoice && (
-        <div
-          ref={voicePopoverRef}
-          style={{
-            position: "fixed",
-            left: hoveredVoice.pillLeft,
-            top: hoveredVoice.pillBottom + 8,
-            zIndex: 200,
-            width: "220px",
-            background: "#ffffff",
-            border: "1px solid #eae4de",
-            borderRadius: "12px",
-            padding: "16px",
-            boxShadow: "0 8px 24px rgba(42,38,34,0.1)",
-          }}
-        >
-          <p style={{ fontSize: "13px", fontWeight: 600, color: "#2a2622", margin: "0 0 2px" }}>
-            {hoveredVoice.voice.title}
-          </p>
-          <p style={{ fontSize: "11px", color: "#9c958f", margin: "0 0 8px" }}>
-            {hoveredVoice.voice.archetype}
-          </p>
-          <p style={{ fontSize: "12px", color: "#756d65", lineHeight: 1.5, margin: "0 0 12px" }}>
-            {hoveredVoice.voice.blurb}
-          </p>
-
-          {/* Change 2: "DELIVERY" label above variant pills */}
-          <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.15em", color: "#b5aca3", textTransform: "uppercase", margin: "0 0 6px" }}>
-            Delivery
-          </p>
-
-          {/* Variant pills */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "12px" }}>
-            {hoveredVoice.voice.intents.map((intent) => {
-              const isActiveIntent = hoveredVoice.voice.id === activeVoice.id && activeVariant === intent
-              return (
-                <button
-                  key={intent}
-                  onClick={() => {
-                    selectVoice(hoveredVoice.voice)
-                    setActiveVariant(intent)
-                    setHoveredVoice(null)
-                  }}
-                  style={{
-                    padding: "3px 10px", borderRadius: "100px",
-                    border: isActiveIntent ? "none" : "1px solid #d4cfc9",
-                    background: isActiveIntent ? "#2a2622" : "transparent",
-                    color: isActiveIntent ? "#faf9f7" : "#756d65",
-                    fontSize: "11px", fontWeight: isActiveIntent ? 500 : 400,
-                    cursor: "pointer", transition: "all 0.12s",
-                  }}
-                >
-                  {intent}
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Sample play button */}
+      {/* ── Floating Voice Panel (right side) ──────────────────────────── */}
+      <div style={{
+        position: "fixed",
+        right: voicePanelOpen ? "16px" : "-240px",
+        top: "50%",
+        transform: "translateY(-50%)",
+        width: "280px",
+        maxHeight: "calc(100vh - 120px)",
+        background: "#ffffff",
+        border: "1px solid #eae4de",
+        borderRadius: "16px",
+        boxShadow: "0 8px 32px rgba(42,38,34,0.08)",
+        zIndex: 60,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        transition: "right 0.3s cubic-bezier(0.16,1,0.3,1)",
+      }}>
+        {/* Panel header */}
+        <div style={{
+          padding: "16px 16px 12px",
+          borderBottom: "1px solid #eae4de",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexShrink: 0,
+        }}>
+          <span style={{
+            fontSize: "10px", fontWeight: 700, letterSpacing: "0.12em",
+            color: "#b5aca3", textTransform: "uppercase",
+          }}>
+            Edition 01
+          </span>
           <button
-            onClick={() => toggleSamplePlay(hoveredVoice.voice)}
+            onClick={() => setVoicePanelOpen(false)}
             style={{
-              display: "inline-flex", alignItems: "center", gap: "6px",
-              padding: "5px 10px", borderRadius: "8px",
-              border: "1px solid #d4cfc9", background: "transparent",
-              fontSize: "11px", color: "#756d65", cursor: "pointer",
+              background: "none", border: "none", cursor: "pointer",
+              color: "#b5aca3", display: "flex", padding: "2px",
+              transition: "color 0.15s",
             }}
+            title="Collapse panel"
           >
-            {playingSampleId === hoveredVoice.voice.id ? "⏸ Stop" : "▶ Play sample"}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
           </button>
         </div>
+
+        {/* Voice list (scrollable) */}
+        <div className="lyric-voice-panel-scroll" style={{
+          flex: 1,
+          overflowY: "auto",
+          padding: "8px 0",
+        }}>
+          {voices.map((voice) => {
+            const isActive = activeVoice.id === voice.id
+            return (
+              <div key={voice.id}>
+                {/* Voice card header (always visible) */}
+                <button
+                  className="lyric-vp-card"
+                  onClick={() => selectVoice(voice)}
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    padding: "10px 16px",
+                    background: isActive ? "rgba(234,228,222,0.4)" : "transparent",
+                    border: "none",
+                    borderLeft: isActive ? "2px solid #B8955A" : "2px solid transparent",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    color: "#2a2622",
+                  }}
+                >
+                  {/* Gradient dot */}
+                  <div style={{
+                    width: "10px", height: "10px", borderRadius: "50%", flexShrink: 0,
+                    background: `linear-gradient(135deg, ${voice.gradientFrom}, ${voice.gradientTo})`,
+                  }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{
+                      fontSize: "12px",
+                      fontWeight: isActive ? 600 : 400,
+                      color: isActive ? "#2a2622" : "#756d65",
+                    }}>
+                      {voice.title.split("\u00b7")[0].trim()}
+                    </span>
+                    <span style={{
+                      fontSize: "10px", color: "#b5aca3", marginLeft: "6px",
+                      fontWeight: 500, letterSpacing: "0.02em",
+                    }}>
+                      {voice.archetype}
+                    </span>
+                  </div>
+                </button>
+
+                {/* Expanded details (active voice only) */}
+                <div style={{
+                  maxHeight: isActive ? "300px" : "0",
+                  opacity: isActive ? 1 : 0,
+                  overflow: "hidden",
+                  transition: "max-height 0.25s ease, opacity 0.2s ease",
+                }}>
+                  <div style={{ padding: "4px 16px 14px 28px" }}>
+                    <p style={{ fontSize: "11px", color: "#9c958f", margin: "0 0 12px", lineHeight: 1.5 }}>
+                      {voice.blurb}
+                    </p>
+
+                    {/* Expression label */}
+                    <p style={{
+                      fontSize: "9px", fontWeight: 700, letterSpacing: "0.12em",
+                      color: "#b5aca3", textTransform: "uppercase", margin: "0 0 6px",
+                    }}>
+                      Expression
+                    </p>
+
+                    {/* Variant pills */}
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "10px" }}>
+                      {voice.intents.map((intent) => {
+                        const isActiveIntent = activeVariant === intent
+                        return (
+                          <button
+                            key={intent}
+                            className="lyric-vp-expr"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setActiveVariant(intent)
+                            }}
+                            style={{
+                              padding: "3px 10px", borderRadius: "100px",
+                              border: isActiveIntent ? "none" : "1px solid #d4cfc9",
+                              background: isActiveIntent ? "#2a2622" : "transparent",
+                              color: isActiveIntent ? "#faf9f7" : "#756d65",
+                              fontSize: "11px", fontWeight: isActiveIntent ? 500 : 400,
+                              cursor: "pointer", transition: "all 0.12s",
+                            }}
+                          >
+                            {intent}
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {/* Play sample */}
+                    <button
+                      className="lyric-vp-sample"
+                      onClick={(e) => { e.stopPropagation(); toggleSamplePlay(voice) }}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: "5px",
+                        padding: "4px 10px", borderRadius: "8px",
+                        border: "1px solid #d4cfc9", background: "transparent",
+                        fontSize: "10px", color: "#756d65", cursor: "pointer",
+                        transition: "background 0.12s",
+                      }}
+                    >
+                      {playingSampleId === voice.id ? (
+                        <>
+                          <svg width="8" height="10" viewBox="0 0 10 12" fill="#756d65">
+                            <rect x="0" y="0" width="3.5" height="12" rx="1" />
+                            <rect x="6.5" y="0" width="3.5" height="12" rx="1" />
+                          </svg>
+                          Stop
+                        </>
+                      ) : (
+                        <>
+                          <svg width="8" height="10" viewBox="0 0 10 12" fill="#756d65">
+                            <path d="M0 0L10 6L0 12V0Z" />
+                          </svg>
+                          Play sample
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Panel open toggle (visible when panel is collapsed) */}
+      {!voicePanelOpen && (
+        <button
+          onClick={() => setVoicePanelOpen(true)}
+          title="Open voice panel"
+          style={{
+            position: "fixed",
+            right: "0",
+            top: "50%",
+            transform: "translateY(-50%)",
+            zIndex: 60,
+            width: "40px",
+            height: "80px",
+            borderRadius: "12px 0 0 12px",
+            background: "#ffffff",
+            border: "1px solid #eae4de",
+            borderRight: "none",
+            boxShadow: "-4px 0 16px rgba(42,38,34,0.06)",
+            cursor: "pointer",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+            transition: "background 0.15s",
+          }}
+        >
+          <div style={{
+            width: "10px", height: "10px", borderRadius: "50%",
+            background: `linear-gradient(135deg, ${activeVoice.gradientFrom}, ${activeVoice.gradientTo})`,
+          }} />
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#756d65" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
       )}
 
       {/* ── Selection toolbar ────────────────────────────────────────────── */}
