@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react"
 import { getAllVoices, VoiceDefinition } from "@/lib/voiceData"
 import { getPlanConfig, remainingGenerations, resolvePlanId, hasPaidPlan } from "@/lib/planConfig"
-import { Plus, Download, RotateCcw, Clock, X } from "lucide-react"
+import { Plus, Download, RotateCcw } from "lucide-react"
 import { trackGeneration, trackDownload, trackPreview } from "@/lib/analytics"
 
 const MARKETING_URL = "https://lyric-marketing.vercel.app"
@@ -231,11 +231,9 @@ function Composer() {
   // Usage — optimistic client-side tracking
   const [usedToday, setUsedToday] = useState(0)
 
-  // History drawer
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  // History (inline strip)
   const [compositions, setCompositions] = useState<Composition[]>([])
   const [loadingCompositions, setLoadingCompositions] = useState(false)
-  const sidebarRef = useRef<HTMLDivElement>(null)
 
   // FTU state
   const [ftuScript, setFtuScript] = useState(false)
@@ -455,7 +453,7 @@ function Composer() {
   }
 
   // ---------------------------------------------------------------------------
-  // History drawer
+  // History
   // ---------------------------------------------------------------------------
 
   const loadCompositions = useCallback(async () => {
@@ -468,10 +466,6 @@ function Composer() {
     }
   }, [])
 
-  function openSidebar() {
-    setSidebarOpen(true)
-    loadCompositions()
-  }
 
   async function deleteComposition(id: string) {
     if (!confirm("Delete this composition?")) return
@@ -489,7 +483,6 @@ function Composer() {
     }
     setAudioUrl(null); setAudioBlob(null); setIsPlaying(false)
     setCurrentTime(0); setDuration(0); setGenerationError(null)
-    setSidebarOpen(false)
   }
 
   function handleNewComposition() {
@@ -503,14 +496,8 @@ function Composer() {
   // Effects
   // ---------------------------------------------------------------------------
 
-  useEffect(() => {
-    if (!sidebarOpen) return
-    function onMouseDown(e: MouseEvent) {
-      if (sidebarRef.current && !sidebarRef.current.contains(e.target as Node)) setSidebarOpen(false)
-    }
-    document.addEventListener("mousedown", onMouseDown)
-    return () => document.removeEventListener("mousedown", onMouseDown)
-  }, [sidebarOpen])
+  // Load compositions on mount
+  useEffect(() => { loadCompositions() }, [loadCompositions])
 
   useEffect(() => {
     if (!selectionInfo) return
@@ -643,6 +630,11 @@ function Composer() {
         .lyric-toolbar-row::-webkit-scrollbar { display: none; }
         .lyric-voice-panel-scroll { scrollbar-width: none; }
         .lyric-voice-panel-scroll::-webkit-scrollbar { display: none; }
+        .lyric-history-strip::-webkit-scrollbar { display: none; }
+        .lyric-history-strip { -ms-overflow-style: none; scrollbar-width: none; }
+        .lyric-history-card:hover { border-color: #d4cfc9 !important; box-shadow: 0 2px 8px rgba(42,38,34,0.06) !important; }
+        .lyric-history-card:hover button { color: #9c958f !important; }
+        .lyric-history-card:active { transform: scale(0.98); }
         .lyric-vp-card { transition: background 0.15s ease; }
         .lyric-vp-card:hover { background: rgba(234,228,222,0.5) !important; }
         .lyric-vp-expr { transition: background 0.12s ease; }
@@ -721,7 +713,7 @@ function Composer() {
             >
               <RotateCcw size={20} strokeWidth={1.5} />
             </ActionButton>
-            <ActionButton title="History" onClick={openSidebar}><Clock size={20} strokeWidth={1.5} /></ActionButton>
+
             <div style={{ flex: 1 }} />
             <span style={{ fontSize: "11px", fontVariantNumeric: "tabular-nums", color: isOverScriptLimit ? "#c4722a" : "#b5aca3" }}>
               {assembledScript.length} / {plan.maxScriptCharacters}
@@ -811,7 +803,7 @@ function Composer() {
               />
             )}
             <span style={{ position: "relative", zIndex: 1 }}>
-              {isGenerating ? "Generating…" : isAtLimit ? "Daily limit reached — resets at midnight UTC" : "Generate"}
+              {isGenerating ? "Generating…" : isAtLimit ? "Daily limit reached" : "Generate"}
             </span>
           </button>
 
@@ -821,6 +813,90 @@ function Composer() {
             anchorRef={generateBtnRef}
             onDismiss={dismissFtu3}
           />
+
+          {/* ── Inline history strip ────────────────────────────────────── */}
+          {compositions.length > 0 && (
+            <div style={{ marginTop: "48px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+                <span style={{
+                  fontSize: "10px", fontWeight: 600, letterSpacing: "0.12em",
+                  color: "#b5aca3", textTransform: "uppercase",
+                }}>
+                  Recent
+                </span>
+                <div style={{ flex: 1, height: "1px", background: "#eae4de" }} />
+              </div>
+              <div
+                className="lyric-history-strip"
+                style={{
+                  display: "flex",
+                  gap: "10px",
+                  overflowX: "auto",
+                  paddingBottom: "4px",
+                }}
+              >
+                {compositions.slice(0, 10).map((comp) => {
+                  const voice = voices.find((v) => v.id === comp.voice_id)
+                  const date = new Date(comp.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                  const preview = comp.title ?? comp.script.slice(0, 50)
+                  return (
+                    <div
+                      key={comp.id}
+                      className="lyric-history-card"
+                      onClick={() => restoreComposition(comp)}
+                      style={{
+                        minWidth: "180px",
+                        maxWidth: "220px",
+                        borderRadius: "10px",
+                        border: "1px solid #eae4de",
+                        padding: "10px 12px",
+                        cursor: "pointer",
+                        flexShrink: 0,
+                        background: "#ffffff",
+                        transition: "border-color 0.15s, box-shadow 0.15s",
+                      }}
+                    >
+                      {voice && (
+                        <div style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "6px" }}>
+                          <div style={{
+                            width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
+                            background: `linear-gradient(135deg, ${voice.gradientFrom}, ${voice.gradientTo})`,
+                          }} />
+                          <span style={{ fontSize: "9px", fontWeight: 600, color: "#756d65", letterSpacing: "0.02em" }}>
+                            {voice.archetype}
+                          </span>
+                          <span style={{ fontSize: "9px", color: "#b5aca3" }}>
+                            {comp.variant}
+                          </span>
+                        </div>
+                      )}
+                      <p style={{
+                        fontSize: "11px", color: "#2a2622", margin: 0, lineHeight: 1.4,
+                        overflow: "hidden", textOverflow: "ellipsis",
+                        display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+                      }}>
+                        {preview}
+                      </p>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "6px" }}>
+                        <span style={{ fontSize: "9px", color: "#b5aca3" }}>{date}</span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deleteComposition(comp.id) }}
+                          title="Delete"
+                          style={{
+                            background: "none", border: "none", color: "#d4cfc9",
+                            cursor: "pointer", fontSize: "14px", lineHeight: 1, padding: "2px",
+                            transition: "color 0.15s",
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
         </div>
       </main>
@@ -1056,65 +1132,6 @@ function Composer() {
         />
       )}
 
-      {/* ── History drawer (right edge) ───────────────────────────────── */}
-      {sidebarOpen && (
-        <div
-          ref={sidebarRef}
-          style={{
-            position: "fixed", top: 0, right: 0, bottom: 0, width: "320px", zIndex: 100,
-            background: "#ffffff", borderLeft: "1px solid #eae4de",
-            display: "flex", flexDirection: "column",
-            boxShadow: "-4px 0 24px rgba(42,38,34,0.08)",
-          }}
-        >
-          <div style={{ padding: "16px 20px", borderBottom: "1px solid #eae4de", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <p style={{ fontSize: "12px", fontWeight: 600, color: "#2a2622", margin: 0 }}>History</p>
-            <button onClick={() => setSidebarOpen(false)} style={{ background: "none", border: "none", color: "#9c958f", cursor: "pointer", padding: "0 2px", display: "flex" }}><X size={16} strokeWidth={1.5} /></button>
-          </div>
-          <div style={{ flex: 1, overflowY: "auto", padding: "12px" }}>
-            {loadingCompositions ? (
-              <p style={{ fontSize: "12px", color: "#b5aca3", textAlign: "center", paddingTop: "40px" }}>Loading…</p>
-            ) : compositions.length === 0 ? (
-              <p style={{ fontSize: "12px", color: "#b5aca3", textAlign: "center", paddingTop: "40px", lineHeight: 1.6 }}>
-                No compositions yet.<br />Generate one to save it here.
-              </p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                {compositions.map((comp) => {
-                  const voice = voices.find((v) => v.id === comp.voice_id)
-                  const date = new Date(comp.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })
-                  const preview = comp.title ?? comp.script.slice(0, 60)
-                  return (
-                    <div
-                      key={comp.id}
-                      onClick={() => restoreComposition(comp)}
-                      style={{ borderRadius: "10px", border: "1px solid #eae4de", padding: "10px 12px", cursor: "pointer", display: "flex", flexDirection: "column", gap: "4px" }}
-                    >
-                      {voice && (
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                          <div style={{ width: "10px", height: "10px", borderRadius: "50%", flexShrink: 0, background: `linear-gradient(135deg, ${voice.gradientFrom}, ${voice.gradientTo})` }} />
-                          <span style={{ fontSize: "10px", fontWeight: 600, color: "#756d65" }}>{voice.archetype} · {comp.variant}</span>
-                        </div>
-                      )}
-                      <p style={{ fontSize: "12px", color: "#2a2622", margin: 0, lineHeight: 1.4 }}>{preview}</p>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
-                        <span style={{ fontSize: "10px", color: "#b5aca3" }}>{date}</span>
-                        {comp.duration_s != null && <span style={{ fontSize: "10px", color: "#b5aca3" }}>{fmt(comp.duration_s)}</span>}
-                        <div style={{ flex: 1 }} />
-                        <button
-                          onClick={(e) => { e.stopPropagation(); deleteComposition(comp.id) }}
-                          title="Delete"
-                          style={{ background: "none", border: "none", color: "#d4cfc9", cursor: "pointer", fontSize: "16px", lineHeight: 1, padding: "2px" }}
-                        >×</button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Change 5: Floating pill player bar */}
       {audioUrl && (
