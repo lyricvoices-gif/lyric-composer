@@ -10,7 +10,7 @@
  *   STRIPE_SECRET_KEY          — from Stripe dashboard
  *   STRIPE_PRICE_CREATOR       — Stripe price ID for Creator ($29/mo)
  *   STRIPE_PRICE_STUDIO        — Stripe price ID for Studio ($99/mo)
- *   NEXT_PUBLIC_APP_URL        — e.g. https://composer.lyricvoices.com
+ *   NEXT_PUBLIC_APP_URL        — e.g. https://composer.lyricvoices.ai
  */
 
 import { createClient } from "@/lib/supabase/server"
@@ -48,7 +48,7 @@ export async function POST(req: Request): Promise<Response> {
 
   const email = user.email ?? (user.user_metadata?.email as string | undefined) ?? ""
   const phone = user.phone ?? (user.user_metadata?.phone as string | undefined) ?? ""
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://composer.lyricvoices.com"
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://composer.lyricvoices.ai"
 
   // Retrieve or create Stripe customer so subscriptions are linked to one customer record
   const sql = db()

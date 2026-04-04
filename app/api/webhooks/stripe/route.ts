@@ -13,7 +13,7 @@
  *   STRIPE_WEBHOOK_SECRET    — from Stripe Dashboard → Webhooks → Signing Secret
  *
  * Setup in Stripe Dashboard:
- *   Webhooks → Add endpoint → https://composer.lyricvoices.com/api/webhooks/stripe
+ *   Webhooks → Add endpoint → https://composer.lyricvoices.ai/api/webhooks/stripe
  *   Subscribe to: checkout.session.completed, customer.subscription.deleted,
  *                 invoice.payment_succeeded, invoice.payment_failed
  *
