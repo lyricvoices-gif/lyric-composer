@@ -171,7 +171,7 @@ function UpgradeContent() {
           borderBottom: `1px solid ${BORDER}`,
         }}>
           <a href={MARKETING_URL} style={{ textDecoration: "none", display: "flex", alignItems: "center" }}>
-            <Wordmark height={14} color={LIGHT} />
+            <Wordmark height={24} color={LIGHT} />
           </a>
         </header>
 
