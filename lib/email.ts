@@ -15,6 +15,9 @@ import { render } from "@react-email/components"
 import TrialWelcome from "@/emails/TrialWelcome"
 import TrialNudge from "@/emails/TrialNudge"
 import TrialConversion from "@/emails/TrialConversion"
+import SubscriptionConfirmed from "@/emails/SubscriptionConfirmed"
+import PaymentFailed from "@/emails/PaymentFailed"
+import CancellationConfirmed from "@/emails/CancellationConfirmed"
 
 function resend() {
   const key = process.env.RESEND_API_KEY
@@ -73,13 +76,15 @@ export async function scheduleTrialNudge(params: {
 
   const html = await render(TrialNudge({ firstName: params.firstName }))
 
-  return resend().emails.send({
+  const response = await resend().emails.send({
     from: from(),
     to: params.to,
     subject: "2 days left in your Lyric trial",
     html,
     scheduledAt: sendAt.toISOString(),
   })
+
+  return response
 }
 
 // ---------------------------------------------------------------------------
@@ -96,11 +101,88 @@ export async function scheduleTrialConversion(params: {
 
   const html = await render(TrialConversion({ firstName: params.firstName }))
 
-  return resend().emails.send({
+  const response = await resend().emails.send({
     from: from(),
     to: params.to,
     subject: "Your Lyric trial ends tomorrow",
     html,
     scheduledAt: sendAt.toISOString(),
   })
+
+  return response
+}
+
+// ---------------------------------------------------------------------------
+// Subscription confirmed (sent on first real charge after trial)
+// ---------------------------------------------------------------------------
+
+export async function sendSubscriptionConfirmed(params: {
+  to: string
+  firstName?: string
+  planName: string
+  amount: string
+}) {
+  const html = await render(
+    SubscriptionConfirmed({
+      firstName: params.firstName,
+      planName: params.planName,
+      amount: params.amount,
+    })
+  )
+
+  return resend().emails.send({
+    from: from(),
+    to: params.to,
+    subject: `Welcome to Lyric ${params.planName}`,
+    html,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Payment failed
+// ---------------------------------------------------------------------------
+
+export async function sendPaymentFailed(params: {
+  to: string
+  firstName?: string
+}) {
+  const html = await render(PaymentFailed({ firstName: params.firstName }))
+
+  return resend().emails.send({
+    from: from(),
+    to: params.to,
+    subject: "Your Lyric payment didn't go through",
+    html,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Cancellation confirmed
+// ---------------------------------------------------------------------------
+
+export async function sendCancellationConfirmed(params: {
+  to: string
+  firstName?: string
+}) {
+  const html = await render(
+    CancellationConfirmed({ firstName: params.firstName })
+  )
+
+  return resend().emails.send({
+    from: from(),
+    to: params.to,
+    subject: "Your Lyric subscription has been cancelled",
+    html,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Cancel scheduled emails (used when a user cancels mid-trial)
+// ---------------------------------------------------------------------------
+
+export async function cancelScheduledEmails(emailIds: string[]) {
+  const client = resend()
+  await Promise.allSettled(
+    emailIds.map((id) => client.emails.cancel(id))
+  )
 }

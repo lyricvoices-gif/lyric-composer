@@ -14,17 +14,23 @@ import * as React from "react"
 
 const ISOTOPE_SRC = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32"><path fill="#2b2a25" d="m8,16c0,4.42,3.58,8,8,8h8v-4h-8c-2.21,0-4-1.79-4-4v-4h-4v4Z"/><polygon fill="#2b2a25" points="24 16 24 8 12 8 12 12 20 12 20 16 24 16"/></svg>').toString('base64')}`
 
-interface TrialNudgeProps {
+interface SubscriptionConfirmedProps {
   firstName?: string
+  planName: string
+  amount: string
 }
 
-export default function TrialNudge({ firstName }: TrialNudgeProps) {
+export default function SubscriptionConfirmed({
+  firstName,
+  planName,
+  amount,
+}: SubscriptionConfirmedProps) {
   const name = firstName ?? "there"
 
   return (
     <Html>
       <Head />
-      <Preview>2 days left in your Lyric trial.</Preview>
+      <Preview>Your {planName} plan is now active.</Preview>
       <Body style={body}>
         <Container style={container}>
 
@@ -33,15 +39,14 @@ export default function TrialNudge({ firstName }: TrialNudgeProps) {
           <Hr style={divider} />
 
           <Section style={content}>
-            <Text style={eyebrow}>2 days remaining</Text>
-            <Text style={heading}>Still haven&apos;t heard it?</Text>
+            <Text style={eyebrow}>YOU&apos;RE IN</Text>
+            <Text style={heading}>Welcome to Lyric {planName}.</Text>
             <Text style={paragraph}>
-              Hey {name} — your Lyric trial ends in 2 days. If you haven&apos;t
-              opened the composer yet, now&apos;s the time.
+              Hey {name} — your {planName} plan is now active. You were charged{" "}
+              {amount} today, and your subscription renews monthly from here.
             </Text>
             <Text style={paragraph}>
-              Try loading a line of copy you&apos;ve been struggling to make feel
-              right — and run it through Morgan or Nova. Direction changes everything.
+              Every voice. Every direction preset. Every generation — yours to use.
             </Text>
           </Section>
 
@@ -53,8 +58,8 @@ export default function TrialNudge({ firstName }: TrialNudgeProps) {
 
           <Section style={content}>
             <Text style={hint}>
-              Your trial converts to Creator ($29/mo) in 2 days. No action needed
-              if you&apos;d like to continue. Cancel anytime in account settings.
+              Manage your subscription or update payment methods anytime from your
+              account settings.
             </Text>
           </Section>
 

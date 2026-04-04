@@ -4,7 +4,9 @@
  *
  * Registered events:
  *   checkout.session.completed    — activate paid plan (+ set trial_ends_at if trial)
- *   customer.subscription.deleted — deactivate plan on cancellation
+ *   customer.subscription.deleted — deactivate plan + send cancellation email + cancel scheduled emails
+ *   invoice.payment_succeeded     — send subscription confirmed email on first real charge after trial
+ *   invoice.payment_failed        — send payment failed email
  *
  * Required env vars:
  *   STRIPE_SECRET_KEY        — from Stripe dashboard
@@ -12,7 +14,11 @@
  *
  * Setup in Stripe Dashboard:
  *   Webhooks → Add endpoint → https://composer.lyricvoices.com/api/webhooks/stripe
- *   Subscribe to: checkout.session.completed, customer.subscription.deleted
+ *   Subscribe to: checkout.session.completed, customer.subscription.deleted,
+ *                 invoice.payment_succeeded, invoice.payment_failed
+ *
+ * NOTE: You must register invoice.payment_succeeded and invoice.payment_failed
+ *       in the Stripe Dashboard webhook settings for these handlers to fire.
  */
 
 import { headers } from "next/headers"
@@ -23,6 +29,10 @@ import {
   sendTrialWelcome,
   scheduleTrialNudge,
   scheduleTrialConversion,
+  sendSubscriptionConfirmed,
+  sendPaymentFailed,
+  sendCancellationConfirmed,
+  cancelScheduledEmails,
 } from "@/lib/email"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
@@ -76,7 +86,6 @@ export async function POST(req: Request): Promise<Response> {
 
     // Send trial email sequence if this is a trial start
     if (isTrial && trialEndsAt) {
-      // Look up user email for the email sequence
       try {
         const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(userId)
         if (user) {
@@ -88,16 +97,77 @@ export async function POST(req: Request): Promise<Response> {
 
           if (email) {
             const emailParams = { to: email, firstName, trialEndsAt: new Date(trialEndsAt) }
-            Promise.allSettled([
+
+            // Send all trial emails and capture scheduled email IDs for later cancellation
+            const [, nudgeResult, conversionResult] = await Promise.allSettled([
               sendTrialWelcome(emailParams),
               scheduleTrialNudge(emailParams),
               scheduleTrialConversion(emailParams),
-            ]).catch(() => {})
+            ])
+
+            // Store scheduled email IDs in app_metadata so we can cancel them if user cancels mid-trial
+            const scheduledEmailIds: string[] = []
+            if (nudgeResult.status === "fulfilled" && nudgeResult.value.data?.id) {
+              scheduledEmailIds.push(nudgeResult.value.data.id)
+            }
+            if (conversionResult.status === "fulfilled" && conversionResult.value.data?.id) {
+              scheduledEmailIds.push(conversionResult.value.data.id)
+            }
+
+            if (scheduledEmailIds.length > 0) {
+              await supabaseAdmin.auth.admin.updateUserById(userId, {
+                app_metadata: { scheduled_email_ids: scheduledEmailIds },
+              })
+            }
           }
         }
       } catch (err) {
         console.error("[webhook/stripe] Failed to send trial emails:", err)
       }
+    }
+  }
+
+  // ── invoice.payment_succeeded — send subscription confirmed on first real charge ──
+  if (event.type === "invoice.payment_succeeded") {
+    const invoice = event.data.object as Stripe.Invoice
+    const customerId = invoice.customer as string
+
+    // Only send on first real charge after trial (not the $0 trial invoice)
+    if (invoice.amount_paid > 0 && (invoice.billing_reason === "subscription_cycle" || invoice.billing_reason === "subscription_create")) {
+      try {
+        const { email, firstName, userId } = await lookupUserByCustomerId(customerId)
+        if (email && userId) {
+          // Determine plan name from user profile, amount from invoice
+          const { data: { user: freshUser } } = await supabaseAdmin.auth.admin.getUserById(userId)
+          const planTier = freshUser?.app_metadata?.plan_tier as string | undefined
+          const planName = planTier === "studio" ? "Studio" : "Creator"
+          const amount = `$${(invoice.amount_paid / 100).toFixed(0)}`
+
+          await sendSubscriptionConfirmed({ to: email, firstName, planName, amount })
+
+          // Clear scheduled email IDs since the trial has converted
+          await supabaseAdmin.auth.admin.updateUserById(userId, {
+            app_metadata: { scheduled_email_ids: null },
+          })
+        }
+      } catch (err) {
+        console.error("[webhook/stripe] Failed to send subscription confirmed email:", err)
+      }
+    }
+  }
+
+  // ── invoice.payment_failed — notify user ──────────────────────────────────
+  if (event.type === "invoice.payment_failed") {
+    const invoice = event.data.object as Stripe.Invoice
+    const customerId = invoice.customer as string
+
+    try {
+      const { email, firstName } = await lookupUserByCustomerId(customerId)
+      if (email) {
+        await sendPaymentFailed({ to: email, firstName })
+      }
+    } catch (err) {
+      console.error("[webhook/stripe] Failed to send payment failed email:", err)
     }
   }
 
@@ -107,18 +177,32 @@ export async function POST(req: Request): Promise<Response> {
     const customerId = sub.customer as string
 
     try {
-      const sql = db()
-      const rows = await sql`
-        SELECT user_id FROM user_profiles
-        WHERE stripe_customer_id = ${customerId}
-        LIMIT 1
-      `
-      const userId = (rows[0] as { user_id: string } | undefined)?.user_id
+      const { email, firstName, userId } = await lookupUserByCustomerId(customerId)
+
       if (userId) {
         await deactivatePlan(userId)
+
+        // Send cancellation confirmation email
+        if (email) {
+          await sendCancellationConfirmed({ to: email, firstName })
+        }
+
+        // Cancel any pending scheduled trial emails
+        try {
+          const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(userId)
+          const scheduledEmailIds = (user?.app_metadata?.scheduled_email_ids as string[] | undefined) ?? []
+          if (scheduledEmailIds.length > 0) {
+            await cancelScheduledEmails(scheduledEmailIds)
+            await supabaseAdmin.auth.admin.updateUserById(userId, {
+              app_metadata: { scheduled_email_ids: null },
+            })
+          }
+        } catch (cancelErr) {
+          console.error("[webhook/stripe] Failed to cancel scheduled emails:", cancelErr)
+        }
       }
     } catch (err) {
-      console.error("[webhook/stripe] Failed to deactivate plan:", err)
+      console.error("[webhook/stripe] Failed to handle subscription deletion:", err)
     }
   }
 
@@ -128,6 +212,33 @@ export async function POST(req: Request): Promise<Response> {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** Look up a user's email, firstName, and userId by their Stripe customer ID. */
+async function lookupUserByCustomerId(customerId: string): Promise<{
+  email: string | undefined
+  firstName: string | undefined
+  userId: string | undefined
+}> {
+  const sql = db()
+  const rows = await sql`
+    SELECT user_id FROM user_profiles
+    WHERE stripe_customer_id = ${customerId}
+    LIMIT 1
+  `
+  const userId = (rows[0] as { user_id: string } | undefined)?.user_id
+  if (!userId) return { email: undefined, firstName: undefined, userId: undefined }
+
+  const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(userId)
+  if (!user) return { email: undefined, firstName: undefined, userId }
+
+  const email = user.email ?? (user.user_metadata?.email as string | undefined)
+  const firstName =
+    (user.user_metadata?.full_name as string | undefined)?.split(" ")[0] ??
+    (user.user_metadata?.name as string | undefined)?.split(" ")[0] ??
+    undefined
+
+  return { email, firstName, userId }
+}
 
 async function activatePlan(
   userId: string,

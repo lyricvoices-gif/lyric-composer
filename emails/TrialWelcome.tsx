@@ -5,11 +5,14 @@ import {
   Head,
   Hr,
   Html,
+  Img,
   Preview,
   Section,
   Text,
 } from "@react-email/components"
 import * as React from "react"
+
+const ISOTOPE_SRC = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32"><path fill="#2b2a25" d="m8,16c0,4.42,3.58,8,8,8h8v-4h-8c-2.21,0-4-1.79-4-4v-4h-4v4Z"/><polygon fill="#2b2a25" points="24 16 24 8 12 8 12 12 20 12 20 16 24 16"/></svg>').toString('base64')}`
 
 interface TrialWelcomeProps {
   firstName?: string
@@ -26,8 +29,7 @@ export default function TrialWelcome({ firstName, trialEndsAt }: TrialWelcomePro
       <Body style={body}>
         <Container style={container}>
 
-          {/* Wordmark */}
-          <Text style={wordmark}>lyric</Text>
+          <Img src={ISOTOPE_SRC} width="28" height="28" alt="Lyric" style={isotopeLogo} />
 
           <Hr style={divider} />
 
@@ -92,11 +94,7 @@ const container: React.CSSProperties = {
   padding: "40px",
 }
 
-const wordmark: React.CSSProperties = {
-  fontSize: "20px",
-  fontWeight: 400,
-  letterSpacing: "-0.01em",
-  color: DARK,
+const isotopeLogo: React.CSSProperties = {
   margin: "0 0 24px",
 }
 
