@@ -662,6 +662,8 @@ function Composer() {
         .lyric-history-scroll { scrollbar-width: none; }
         .lyric-history-scroll::-webkit-scrollbar { display: none; }
         .lyric-history-item:hover { background: rgba(234,228,222,0.5) !important; }
+        .lyric-history-item:hover .lyric-history-delete { opacity: 1 !important; }
+        .lyric-history-delete:hover { color: #756d65 !important; background: rgba(234,228,222,0.6) !important; }
         .lyric-panel-tab:hover { background: #f5f3ef !important; }
         .lyric-vp-card { transition: background 0.15s ease; }
         .lyric-vp-card:hover { background: rgba(234,228,222,0.5) !important; }
@@ -820,142 +822,115 @@ function Composer() {
         </div>
       </main>
 
-      {/* ── Floating History Panel (left side) ────────────────────────── */}
+      {/* ── History Strip (left side) ──────────────────────────────── */}
       {compositions.length > 0 && (
         <div
+          className="lyric-history-strip"
           onMouseEnter={() => setHistoryPanelOpen(true)}
           onMouseLeave={() => setHistoryPanelOpen(false)}
           style={{
             position: "fixed",
-            left: historyPanelOpen ? "0px" : "-260px",
+            left: 0,
             top: "52px",
             bottom: 0,
+            width: historyPanelOpen ? "280px" : "40px",
             zIndex: 55,
-            display: "flex",
-            transition: "left 0.3s cubic-bezier(0.16,1,0.3,1)",
-          }}
-        >
-          {/* Panel body */}
-          <div style={{
-            width: "260px",
-            height: "100%",
-            background: "rgba(248,246,243,0.97)",
-            backdropFilter: "blur(16px)",
-            borderRight: "1px solid #eae4de",
+            background: historyPanelOpen ? "rgba(248,246,243,0.97)" : "transparent",
+            backdropFilter: historyPanelOpen ? "blur(16px)" : "none",
+            borderRight: historyPanelOpen ? "1px solid #eae4de" : "none",
+            transition: "width 0.25s cubic-bezier(0.16,1,0.3,1), background 0.25s ease",
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
-            flexShrink: 0,
+          }}
+        >
+          {/* Scrollable list */}
+          <div className="lyric-history-scroll" style={{
+            flex: 1,
+            overflowY: historyPanelOpen ? "auto" : "hidden",
+            overflowX: "hidden",
+            padding: "8px 0",
           }}>
-            {/* Panel header */}
-            <div style={{
-              padding: "16px 16px 12px",
-              borderBottom: "1px solid #eae4de",
-              flexShrink: 0,
-            }}>
-              <span style={{
-                fontSize: "10px", fontWeight: 700, letterSpacing: "0.12em",
-                color: "#b5aca3", textTransform: "uppercase",
-              }}>
-                History
-              </span>
-            </div>
+            {(() => {
+              const now = new Date()
+              const todayStr = now.toDateString()
+              const yesterday = new Date(now)
+              yesterday.setDate(yesterday.getDate() - 1)
+              const yesterdayStr = yesterday.toDateString()
 
-            {/* Composition list (scrollable) */}
-            <div className="lyric-history-scroll" style={{
-              flex: 1,
-              overflowY: "auto",
-              padding: "4px 0",
-            }}>
-              {(() => {
-                const now = new Date()
-                const todayStr = now.toDateString()
-                const yesterday = new Date(now)
-                yesterday.setDate(yesterday.getDate() - 1)
-                const yesterdayStr = yesterday.toDateString()
+              let lastGroup = ""
+              return compositions.slice(0, 20).map((comp) => {
+                const preview = comp.title ?? comp.script.slice(0, 60)
+                const compDate = new Date(comp.created_at)
+                const compDateStr = compDate.toDateString()
+                let group = ""
+                if (compDateStr === todayStr) group = "Today"
+                else if (compDateStr === yesterdayStr) group = "Yesterday"
+                else group = compDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })
 
-                let lastGroup = ""
-                return compositions.slice(0, 20).map((comp) => {
-                  const voice = voices.find((v) => v.id === comp.voice_id)
-                  const preview = comp.title ?? comp.script.slice(0, 60)
-                  const compDate = new Date(comp.created_at)
-                  const compDateStr = compDate.toDateString()
-                  let group = ""
-                  if (compDateStr === todayStr) group = "Today"
-                  else if (compDateStr === yesterdayStr) group = "Yesterday"
-                  else group = compDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })
+                const showGroup = group !== lastGroup
+                lastGroup = group
 
-                  const showGroup = group !== lastGroup
-                  lastGroup = group
-
-                  return (
-                    <div key={comp.id}>
-                      {showGroup && (
-                        <div style={{
-                          padding: "12px 16px 4px",
-                          fontSize: "9px", fontWeight: 700, letterSpacing: "0.1em",
-                          color: "#b5aca3", textTransform: "uppercase",
-                        }}>
-                          {group}
-                        </div>
+                return (
+                  <div key={comp.id}>
+                    {showGroup && historyPanelOpen && (
+                      <div style={{
+                        padding: "12px 14px 4px",
+                        fontSize: "9px", fontWeight: 700, letterSpacing: "0.1em",
+                        color: "#b5aca3", textTransform: "uppercase",
+                        whiteSpace: "nowrap",
+                      }}>
+                        {group}
+                      </div>
+                    )}
+                    <div
+                      className="lyric-history-item"
+                      onClick={() => { restoreComposition(comp); setHistoryPanelOpen(false) }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        padding: historyPanelOpen ? "8px 10px 8px 14px" : "8px 0",
+                        cursor: "pointer",
+                        transition: "background 0.12s, padding 0.25s",
+                        position: "relative",
+                      }}
+                    >
+                      <p style={{
+                        fontSize: "13px", color: "#2a2622", margin: 0, lineHeight: 1.4,
+                        overflow: "hidden", textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        flex: 1,
+                        minWidth: 0,
+                        opacity: historyPanelOpen ? 1 : 0,
+                        transition: "opacity 0.2s ease",
+                      }}>
+                        {preview}
+                      </p>
+                      {historyPanelOpen && (
+                        <button
+                          className="lyric-history-delete"
+                          onClick={(e) => { e.stopPropagation(); deleteComposition(comp.id) }}
+                          style={{
+                            flexShrink: 0,
+                            width: "24px", height: "24px",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            background: "none", border: "none",
+                            color: "#d4cfc9", cursor: "pointer",
+                            fontSize: "14px", lineHeight: 1,
+                            borderRadius: "6px",
+                            transition: "color 0.12s, background 0.12s",
+                            opacity: 0,
+                            marginLeft: "4px",
+                          }}
+                        >
+                          ×
+                        </button>
                       )}
-                      <button
-                        className="lyric-history-item"
-                        onClick={() => { restoreComposition(comp); setHistoryPanelOpen(false) }}
-                        style={{
-                          width: "100%",
-                          display: "block",
-                          padding: "8px 16px",
-                          background: "transparent",
-                          border: "none",
-                          cursor: "pointer",
-                          textAlign: "left",
-                          transition: "background 0.12s",
-                        }}
-                      >
-                        <p style={{
-                          fontSize: "13px", color: "#2a2622", margin: 0, lineHeight: 1.4,
-                          overflow: "hidden", textOverflow: "ellipsis",
-                          display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
-                        }}>
-                          {preview}
-                        </p>
-                      </button>
                     </div>
-                  )
-                })
-              })()}
-            </div>
-          </div>
-
-          {/* Edge tab (always visible, attached to panel right edge) */}
-          <div
-            style={{
-              width: "20px",
-              height: "48px",
-              alignSelf: "center",
-              borderRadius: "0 8px 8px 0",
-              background: "rgba(248,246,243,0.92)",
-              border: "1px solid #eae4de",
-              borderLeft: "none",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-              cursor: "pointer",
-            }}
-            onClick={() => setHistoryPanelOpen(!historyPanelOpen)}
-          >
-            <svg
-              width="10" height="10" viewBox="0 0 24 24" fill="none"
-              stroke="#b5aca3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-              style={{
-                transition: "transform 0.3s ease",
-                transform: historyPanelOpen ? "rotate(180deg)" : "rotate(0deg)",
-              }}
-            >
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
+                  </div>
+                )
+              })
+            })()}
           </div>
         </div>
       )}
