@@ -11,8 +11,7 @@ import Wordmark from "@/components/Wordmark"
 
 const MARKETING_URL = "https://lyric-marketing.vercel.app"
 
-// Change 4: 6 inline directions
-const INLINE_DIRECTIONS = ["Emphasis", "Pause", "Whisper", "Slow", "Tender", "Resolute"]
+// Inline direction marks are derived per-voice from palette.emotionGroups
 
 // ---------------------------------------------------------------------------
 // Types
@@ -91,9 +90,10 @@ function getSelectionCharOffsets(el: HTMLElement): { start: number; end: number 
   return { start, end }
 }
 
-// Change 4: no args, returns all 6 directions
-function getDirectionOptions(): string[] {
-  return [...INLINE_DIRECTIONS]
+function getDirectionOptions(voice: VoiceDefinition): string[] {
+  const emotionGroup = voice.palette.emotionGroups.find((g) => g.label === "Emotional Range")
+  if (!emotionGroup) return []
+  return emotionGroup.items.map((item) => item.label)
 }
 
 function assembleSegments(paragraphs: Paragraph[], defaultIntent: string): Array<{ text: string; intent: string }> {
@@ -344,8 +344,7 @@ function Composer() {
   const assembledScript = paragraphs.map((p) => p.text).join("\n\n").trim()
   const isOverScriptLimit = assembledScript.length > plan.maxScriptCharacters
   const canGenerate = !isGenerating && !isAtLimit && !isOverScriptLimit && assembledScript.length > 0
-  // Change 4: no args
-  const directionOptions = getDirectionOptions()
+  const directionOptions = getDirectionOptions(activeVoice)
 
   // ---------------------------------------------------------------------------
   // Voice handlers
