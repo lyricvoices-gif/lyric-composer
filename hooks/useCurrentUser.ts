@@ -10,6 +10,8 @@ interface CurrentUser {
   trialEndsAt: string | null
   onboardingVoice: string | null
   onboardingIntent: string | null
+  lastVoice: string | null
+  lastIntent: string | null
   isLoaded: boolean
 }
 
@@ -25,6 +27,8 @@ export function useCurrentUser(): CurrentUser {
     trialEndsAt: null,
     onboardingVoice: null,
     onboardingIntent: null,
+    lastVoice: null,
+    lastIntent: null,
     isLoaded: false,
   })
 
@@ -34,7 +38,7 @@ export function useCurrentUser(): CurrentUser {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        setState({ userId: null, plan: null, trialEndsAt: null, onboardingVoice: null, onboardingIntent: null, isLoaded: true })
+        setState({ userId: null, plan: null, trialEndsAt: null, onboardingVoice: null, onboardingIntent: null, lastVoice: null, lastIntent: null, isLoaded: true })
         return
       }
       const meta = user.app_metadata ?? {}
@@ -44,6 +48,8 @@ export function useCurrentUser(): CurrentUser {
         trialEndsAt: (meta.trial_ends_at as string) ?? null,
         onboardingVoice: (meta.onboarding_voice as string) ?? null,
         onboardingIntent: (meta.onboarding_intent as string) ?? null,
+        lastVoice: (meta.last_voice as string) ?? null,
+        lastIntent: (meta.last_intent as string) ?? null,
         isLoaded: true,
       })
     }

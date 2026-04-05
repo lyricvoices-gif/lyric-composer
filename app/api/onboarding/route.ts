@@ -17,13 +17,29 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  let body: { voice: string; variant: string; intent: string }
+  let body: Record<string, string>
   try {
     body = await req.json()
   } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400 })
   }
 
+  // ── Save last-used voice (called from composer after generation) ───────
+  if (body.action === "save_last_voice") {
+    const { voiceId, intent } = body
+    if (!voiceId) return Response.json({ error: "Missing voiceId" }, { status: 400 })
+
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+      app_metadata: { last_voice: voiceId, last_intent: intent ?? null },
+    })
+    if (error) {
+      console.error("[api/onboarding] Failed to save last voice:", error)
+      return Response.json({ error: "Failed to save" }, { status: 500 })
+    }
+    return Response.json({ ok: true })
+  }
+
+  // ── Complete onboarding ────────────────────────────────────────────────
   const { voice, variant, intent } = body
 
   if (!voice || !variant || !intent) {

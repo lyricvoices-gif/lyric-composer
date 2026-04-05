@@ -262,7 +262,7 @@ function TutorialButton() {
 // ---------------------------------------------------------------------------
 
 function Composer() {
-  const { plan: planTier, isLoaded, onboardingVoice, onboardingIntent } = useCurrentUser()
+  const { plan: planTier, isLoaded, onboardingVoice, onboardingIntent, lastVoice, lastIntent } = useCurrentUser()
   const voices = getAllVoices()
 
   // Voice & variant — default to onboarding selection if available
@@ -271,14 +271,19 @@ function Composer() {
   const [hasRestoredOnboardingVoice, setHasRestoredOnboardingVoice] = useState(false)
 
   useEffect(() => {
-    if (hasRestoredOnboardingVoice || !isLoaded || !onboardingVoice) return
-    const match = voices.find((v) => v.id === onboardingVoice)
-    if (match) {
-      setActiveVoice(match)
-      setActiveVariant(onboardingIntent ?? match.defaultIntent)
+    if (hasRestoredOnboardingVoice || !isLoaded) return
+    // Priority: last-used voice > onboarding voice > default (voices[0])
+    const voiceId = lastVoice ?? onboardingVoice
+    const intent = lastIntent ?? onboardingIntent
+    if (voiceId) {
+      const match = voices.find((v) => v.id === voiceId)
+      if (match) {
+        setActiveVoice(match)
+        setActiveVariant(intent ?? match.defaultIntent)
+      }
     }
     setHasRestoredOnboardingVoice(true)
-  }, [isLoaded, onboardingVoice, onboardingIntent, voices, hasRestoredOnboardingVoice])
+  }, [isLoaded, lastVoice, lastIntent, onboardingVoice, onboardingIntent, voices, hasRestoredOnboardingVoice])
 
   // Paragraphs with inline marks
   const [paragraphs, setParagraphs] = useState<Paragraph[]>([
@@ -474,6 +479,13 @@ function Composer() {
       setUsedToday((n) => n + 1)
       saveComposition().catch((err) => console.error("[auto-save]", err))
 
+      // Persist last-used voice for next session
+      fetch("/api/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "save_last_voice", voiceId: activeVoice.id, intent: activeVariant }),
+      }).catch(() => {})
+
       // Analytics — dominant direction = mark covering most chars, else active variant
       const markCounts: Record<string, number> = {}
       for (const p of paragraphs) {
@@ -648,6 +660,12 @@ function Composer() {
         [data-placeholder]:empty::before {
           content: attr(data-placeholder); color: #b5aca3; pointer-events: none; display: block;
         }
+        [data-placeholder]:empty::after {
+          content: ""; display: inline-block; width: 1.5px; height: 1.1em;
+          background: #b5aca3; margin-left: 2px; vertical-align: text-bottom;
+          animation: lyric-blink 1s steps(2, start) infinite;
+        }
+        @keyframes lyric-blink { to { opacity: 0; } }
         [contenteditable]:focus { outline: none; }
         .lyric-action-btn:hover:not(:disabled) { background: #e4e0db !important; }
         .lyric-action-btn-inv:hover:not(:disabled) { background: rgba(248,246,243,0.08) !important; }
