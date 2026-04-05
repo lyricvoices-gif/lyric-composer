@@ -235,15 +235,7 @@ function Composer() {
   const [compositions, setCompositions] = useState<Composition[]>([])
   const [loadingCompositions, setLoadingCompositions] = useState(false)
 
-  // FTU state
-  const [ftuScript, setFtuScript] = useState(false)
-  const [ftuHighlight, setFtuHighlight] = useState(false)
-  const [ftuGenerate, setFtuGenerate] = useState(false)
-  const ftuHighlightFired = useRef(false)
-  const ftuGenerateFired = useRef(false)
   const scriptAreaRef = useRef<HTMLDivElement>(null)
-  const generateBtnRef = useRef<HTMLButtonElement>(null)
-  const [ftuScriptPos, setFtuScriptPos] = useState({ left: 0, top: 0 })
 
   // ---------------------------------------------------------------------------
   // Plan
@@ -536,59 +528,6 @@ function Composer() {
   }, [audioUrl])
 
 
-  // FTU 1 — script tooltip, 1.2s after mount
-  useEffect(() => {
-    if (localStorage.getItem("lyric_ftu_script")) return
-    const t = setTimeout(() => setFtuScript(true), 1200)
-    return () => clearTimeout(t)
-  }, [])
-
-  // FTU 1 — track position of first paragraph for fixed tooltip
-  useEffect(() => {
-    if (!ftuScript) return
-    const el = document.querySelector('[data-first-para="true"]')
-    if (el) {
-      const rect = el.getBoundingClientRect()
-      setFtuScriptPos({ left: rect.left, top: rect.top + rect.height / 2 })
-    }
-  }, [ftuScript])
-
-  // FTU 1 — auto-dismiss when user starts typing
-  useEffect(() => {
-    if (assembledScript.length > 0 && ftuScript) {
-      dismissFtu1()
-    }
-  }, [assembledScript.length]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // FTU 2 — highlight tooltip, after 20 chars typed
-  useEffect(() => {
-    if (ftuScript) return
-    if (localStorage.getItem("lyric_ftu_highlight")) return
-    if (assembledScript.length < 20 || ftuHighlightFired.current) return
-    ftuHighlightFired.current = true
-    const t = setTimeout(() => setFtuHighlight(true), 800)
-    return () => clearTimeout(t)
-  }, [assembledScript.length, ftuScript])
-
-  function dismissFtu1() {
-    localStorage.setItem("lyric_ftu_script", "1")
-    setFtuScript(false)
-  }
-
-  function dismissFtu2() {
-    localStorage.setItem("lyric_ftu_highlight", "1")
-    setFtuHighlight(false)
-    if (!localStorage.getItem("lyric_ftu_generate") && !ftuGenerateFired.current) {
-      ftuGenerateFired.current = true
-      setTimeout(() => setFtuGenerate(true), 1000)
-    }
-  }
-
-  function dismissFtu3() {
-    localStorage.setItem("lyric_ftu_generate", "1")
-    setFtuGenerate(false)
-  }
-
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
@@ -635,6 +574,7 @@ function Composer() {
         .lyric-history-card:hover { border-color: #d4cfc9 !important; box-shadow: 0 2px 8px rgba(42,38,34,0.06) !important; }
         .lyric-history-card:hover button { color: #9c958f !important; }
         .lyric-history-card:active { transform: scale(0.98); }
+        .lyric-voices-fab:hover .lyric-voices-fab-circle { box-shadow: 0 4px 16px rgba(42,38,34,0.13) !important; border-color: #d4cfc9 !important; }
         .lyric-vp-card { transition: background 0.15s ease; }
         .lyric-vp-card:hover { background: rgba(234,228,222,0.5) !important; }
         .lyric-vp-expr { transition: background 0.12s ease; }
@@ -647,14 +587,6 @@ function Composer() {
         @keyframes lyric-sweep {
           0% { background-position: 100% 0; }
           100% { background-position: -100% 0; }
-        }
-        @keyframes lyric-ftu-in {
-          from { opacity: 0; transform: translateY(4px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes lyric-ftu-out {
-          from { opacity: 1; transform: translateY(0); }
-          to { opacity: 0; transform: translateY(4px); }
         }
       `}</style>
 
@@ -693,7 +625,7 @@ function Composer() {
       </header>
 
       {/* ── Script area ──────────────────────────────────────────────────── */}
-      <main style={{ flex: 1, padding: "0 24px", paddingRight: voicePanelOpen ? "320px" : "24px", transition: "padding-right 0.3s ease" }}>
+      <main style={{ flex: 1, padding: "0 24px", transition: "none" }}>
         <div ref={scriptAreaRef} style={{ maxWidth: "680px", margin: "0 auto", padding: "48px 0 200px" }}>
 
           {/* Action bar */}
@@ -754,13 +686,6 @@ function Composer() {
             ))}
           </div>
 
-          <FTUTooltip
-            message="Select a word or phrase to apply emotional direction."
-            visible={ftuHighlight}
-            anchorRef={scriptAreaRef}
-            onDismiss={dismissFtu2}
-          />
-
           {/* + paragraph */}
           <button
             onClick={addParagraph}
@@ -777,7 +702,6 @@ function Composer() {
 
           {/* Generate button */}
           <button
-            ref={generateBtnRef}
             onClick={generate}
             disabled={!canGenerate && !isGenerating}
             style={{
@@ -806,13 +730,6 @@ function Composer() {
               {isGenerating ? "Generating…" : isAtLimit ? "Daily limit reached" : "Generate"}
             </span>
           </button>
-
-          <FTUTooltip
-            message="When you're ready, generate to hear your script voiced."
-            visible={ftuGenerate}
-            anchorRef={generateBtnRef}
-            onDismiss={dismissFtu3}
-          />
 
           {/* ── Inline history strip ────────────────────────────────────── */}
           {compositions.length > 0 && (
@@ -1016,11 +933,11 @@ function Composer() {
                       fontSize: "9px", fontWeight: 700, letterSpacing: "0.12em",
                       color: "#b5aca3", textTransform: "uppercase", margin: "0 0 6px",
                     }}>
-                      Expression
+                      Select Expression
                     </p>
 
                     {/* Variant pills */}
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "10px" }}>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "14px" }}>
                       {voice.intents.map((intent) => {
                         const isActiveIntent = activeVariant === intent
                         return (
@@ -1083,40 +1000,47 @@ function Composer() {
         </div>
       </div>
 
-      {/* Panel open toggle (visible when panel is collapsed) */}
+      {/* Floating Voices button (visible when panel is collapsed) */}
       {!voicePanelOpen && (
         <button
+          className="lyric-voices-fab"
           onClick={() => setVoicePanelOpen(true)}
-          title="Open voice panel"
+          title="Voices"
           style={{
             position: "fixed",
-            right: "0",
-            top: "50%",
-            transform: "translateY(-50%)",
+            bottom: "32px",
+            right: "32px",
             zIndex: 60,
-            width: "40px",
-            height: "80px",
-            borderRadius: "12px 0 0 12px",
-            background: "#ffffff",
-            border: "1px solid #eae4de",
-            borderRight: "none",
-            boxShadow: "-4px 0 16px rgba(42,38,34,0.06)",
-            cursor: "pointer",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            justifyContent: "center",
-            gap: "8px",
-            transition: "background 0.15s",
+            gap: "6px",
+            background: "none",
+            border: "none",
+            cursor: "pointer",
           }}
         >
-          <div style={{
-            width: "10px", height: "10px", borderRadius: "50%",
-            background: `linear-gradient(135deg, ${activeVoice.gradientFrom}, ${activeVoice.gradientTo})`,
-          }} />
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#756d65" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
+          <div className="lyric-voices-fab-circle" style={{
+            width: "48px",
+            height: "48px",
+            borderRadius: "50%",
+            background: "#ffffff",
+            border: "1px solid #eae4de",
+            boxShadow: "0 2px 12px rgba(42,38,34,0.08)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "box-shadow 0.15s, border-color 0.15s",
+          }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2a2622" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3v18" />
+              <path d="M8 8v8" />
+              <path d="M16 6v12" />
+              <path d="M4 11v2" />
+              <path d="M20 10v4" />
+            </svg>
+          </div>
+          <span style={{ fontSize: "10px", color: "#9c958f", fontWeight: 500 }}>Voices</span>
         </button>
       )}
 
@@ -1194,31 +1118,6 @@ function Composer() {
         </div>
       )}
 
-      {/* ── FTU 1: fixed left of first paragraph ─────────────────────── */}
-      {ftuScript && ftuScriptPos.left > 0 && (
-        <div style={{
-          position: "fixed",
-          left: ftuScriptPos.left - 224,
-          top: ftuScriptPos.top,
-          transform: "translateY(-50%)",
-          zIndex: 400,
-          width: "200px",
-          background: "rgba(42,38,34,0.92)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          border: "1px solid rgba(255,255,255,0.08)",
-          borderRadius: "12px",
-          padding: "14px 16px",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-          pointerEvents: "none",
-        }}>
-          <div style={{ position: "absolute", top: 0, left: "16px", right: "16px", height: "2px", background: "linear-gradient(90deg, #B8955A, transparent)", borderRadius: "2px 2px 0 0" }} />
-          <p style={{ fontSize: "12px", color: "rgba(248,246,243,0.88)", lineHeight: 1.65, margin: 0, paddingTop: "4px" }}>
-            Click to start writing your script. Highlight any phrase to set the emotional direction.
-          </p>
-          <div style={{ position: "absolute", right: "-7px", top: "50%", transform: "translateY(-50%)", width: 0, height: 0, borderTop: "5px solid transparent", borderBottom: "5px solid transparent", borderLeft: "7px solid rgba(42,38,34,0.92)" }} />
-        </div>
-      )}
     </div>
   )
 }
@@ -1255,60 +1154,6 @@ function ActionButton({
     >
       {children}
     </button>
-  )
-}
-
-function FTUTooltip({
-  message, visible, anchorRef, onDismiss,
-}: {
-  message: string
-  visible: boolean
-  anchorRef: { current: HTMLElement | null }
-  onDismiss: () => void
-}) {
-  const [phase, setPhase] = useState<"hidden" | "in" | "visible" | "out">("hidden")
-  const [pos, setPos] = useState({ left: 0, top: 0 })
-
-  useEffect(() => {
-    if (!visible) { setPhase("hidden"); return }
-    if (anchorRef.current) {
-      const rect = anchorRef.current.getBoundingClientRect()
-      setPos({ left: rect.left + rect.width / 2, top: rect.top })
-    }
-    setPhase("in")
-    const visTimer = setTimeout(() => setPhase("visible"), 400)
-    const outTimer = setTimeout(() => setPhase("out"), 5000)
-    const doneTimer = setTimeout(() => { setPhase("hidden"); onDismiss() }, 5400)
-    return () => { clearTimeout(visTimer); clearTimeout(outTimer); clearTimeout(doneTimer) }
-  }, [visible]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (phase === "hidden") return null
-
-  return (
-    <div style={{
-      width: "200px",
-      background: "rgba(42,38,34,0.92)",
-      backdropFilter: "blur(12px)",
-      WebkitBackdropFilter: "blur(12px)",
-      border: "1px solid rgba(255,255,255,0.08)",
-      borderRadius: "12px",
-      padding: "14px 16px",
-      boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-      opacity: phase === "out" ? 0 : 1,
-      transition: phase === "in"
-        ? "opacity 0.4s cubic-bezier(0.16,1,0.3,1), transform 0.4s cubic-bezier(0.16,1,0.3,1)"
-        : phase === "out" ? "opacity 0.3s ease" : "none",
-      position: "fixed",
-      left: pos.left,
-      top: pos.top - 16,
-      transform: phase === "in" ? "translate(-50%, calc(-100% + 6px))" : "translate(-50%, -100%)",
-      zIndex: 400,
-      pointerEvents: "none",
-    }}>
-      <div style={{ position: "absolute", top: 0, left: "16px", right: "16px", height: "2px", background: "linear-gradient(90deg, #B8955A, transparent)", borderRadius: "2px 2px 0 0" }} />
-      <p style={{ fontSize: "12px", color: "rgba(248,246,243,0.88)", lineHeight: 1.65, margin: 0, paddingTop: "4px" }}>{message}</p>
-      <div style={{ position: "absolute", bottom: "-7px", left: "50%", transform: "translateX(-50%)", width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: "7px solid rgba(42,38,34,0.92)" }} />
-    </div>
   )
 }
 
@@ -1379,6 +1224,12 @@ function ParagraphBlock({
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!canRemove && editorRef.current) {
+      editorRef.current.focus()
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const marksKey = JSON.stringify(para.marks)
   useEffect(() => {
     if (editorRef.current) {
@@ -1424,7 +1275,7 @@ function ParagraphBlock({
         ref={editorRef}
         contentEditable
         suppressContentEditableWarning
-        data-placeholder="Write your script here…"
+        data-placeholder="Pick a voice, start writing, and highlight any phrase to direct emotion."
         data-first-para={!canRemove ? "true" : undefined}
         onInput={handleInput}
         onMouseUp={handleMouseUp}
