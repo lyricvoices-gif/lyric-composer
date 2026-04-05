@@ -822,10 +822,9 @@ function Composer() {
         </div>
       </main>
 
-      {/* ── History Strip (left side) ──────────────────────────────── */}
+      {/* ── History Rail (left side) ─────────────────────────────────── */}
       {compositions.length > 0 && (
         <div
-          className="lyric-history-strip"
           onMouseEnter={() => setHistoryPanelOpen(true)}
           onMouseLeave={() => setHistoryPanelOpen(false)}
           style={{
@@ -833,23 +832,23 @@ function Composer() {
             left: 0,
             top: "52px",
             bottom: 0,
-            width: historyPanelOpen ? "280px" : "40px",
+            width: historyPanelOpen ? "272px" : "48px",
             zIndex: 55,
             background: historyPanelOpen ? "rgba(248,246,243,0.97)" : "transparent",
             backdropFilter: historyPanelOpen ? "blur(16px)" : "none",
-            borderRight: historyPanelOpen ? "1px solid #eae4de" : "none",
-            transition: "width 0.25s cubic-bezier(0.16,1,0.3,1), background 0.25s ease",
+            borderRight: historyPanelOpen ? "1px solid #eae4de" : "1px solid transparent",
+            transition: "width 0.3s cubic-bezier(0.16,1,0.3,1), background 0.3s ease, border-color 0.3s ease",
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
           }}
         >
-          {/* Scrollable list */}
+          {/* Scrollable content */}
           <div className="lyric-history-scroll" style={{
             flex: 1,
             overflowY: historyPanelOpen ? "auto" : "hidden",
             overflowX: "hidden",
-            padding: "8px 0",
+            paddingTop: "16px",
           }}>
             {(() => {
               const now = new Date()
@@ -860,6 +859,7 @@ function Composer() {
 
               let lastGroup = ""
               return compositions.slice(0, 20).map((comp) => {
+                const voice = voices.find((v) => v.id === comp.voice_id)
                 const preview = comp.title ?? comp.script.slice(0, 60)
                 const compDate = new Date(comp.created_at)
                 const compDateStr = compDate.toDateString()
@@ -873,12 +873,17 @@ function Composer() {
 
                 return (
                   <div key={comp.id}>
-                    {showGroup && historyPanelOpen && (
+                    {showGroup && (
                       <div style={{
-                        padding: "12px 14px 4px",
+                        padding: historyPanelOpen ? "14px 16px 6px" : "14px 0 6px",
                         fontSize: "9px", fontWeight: 700, letterSpacing: "0.1em",
                         color: "#b5aca3", textTransform: "uppercase",
                         whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textAlign: historyPanelOpen ? "left" : "center",
+                        opacity: historyPanelOpen ? 1 : 0,
+                        height: historyPanelOpen ? "auto" : "0px",
+                        transition: "opacity 0.2s ease, height 0.2s ease",
                       }}>
                         {group}
                       </div>
@@ -889,38 +894,52 @@ function Composer() {
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        padding: historyPanelOpen ? "8px 10px 8px 14px" : "8px 0",
+                        gap: "10px",
+                        padding: historyPanelOpen ? "7px 10px 7px 16px" : "7px 0",
+                        justifyContent: historyPanelOpen ? "flex-start" : "center",
                         cursor: "pointer",
-                        transition: "background 0.12s, padding 0.25s",
-                        position: "relative",
+                        transition: "background 0.12s, padding 0.3s",
+                        borderRadius: historyPanelOpen ? "0" : "0",
                       }}
                     >
+                      {/* Voice gradient dot — always visible */}
+                      <div style={{
+                        width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
+                        background: voice
+                          ? "linear-gradient(135deg, " + voice.gradientFrom + ", " + voice.gradientTo + ")"
+                          : "linear-gradient(135deg, #c9a96e, #9c958f)",
+                        transition: "transform 0.2s ease",
+                        transform: historyPanelOpen ? "scale(1)" : "scale(0.85)",
+                      }} />
+
+                      {/* Text preview — visible when expanded */}
                       <p style={{
-                        fontSize: "13px", color: "#2a2622", margin: 0, lineHeight: 1.4,
+                        fontSize: "13px", color: "#2a2622", margin: 0, lineHeight: 1.35,
                         overflow: "hidden", textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
                         flex: 1,
                         minWidth: 0,
                         opacity: historyPanelOpen ? 1 : 0,
-                        transition: "opacity 0.2s ease",
+                        transition: "opacity 0.15s ease 0.05s",
                       }}>
                         {preview}
                       </p>
+
+                      {/* Delete icon — appears on item hover when expanded */}
                       {historyPanelOpen && (
                         <button
                           className="lyric-history-delete"
                           onClick={(e) => { e.stopPropagation(); deleteComposition(comp.id) }}
                           style={{
                             flexShrink: 0,
-                            width: "24px", height: "24px",
+                            width: "22px", height: "22px",
                             display: "flex", alignItems: "center", justifyContent: "center",
                             background: "none", border: "none",
                             color: "#d4cfc9", cursor: "pointer",
-                            fontSize: "14px", lineHeight: 1,
-                            borderRadius: "6px",
-                            transition: "color 0.12s, background 0.12s",
+                            fontSize: "13px", lineHeight: 1,
+                            borderRadius: "5px",
+                            transition: "color 0.12s, background 0.12s, opacity 0.12s",
                             opacity: 0,
-                            marginLeft: "4px",
                           }}
                         >
                           ×
