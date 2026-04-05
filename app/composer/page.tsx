@@ -830,8 +830,9 @@ function Composer() {
           style={{
             position: "fixed",
             left: 0,
-            top: "52px",
-            bottom: 0,
+            top: "50%",
+            transform: "translateY(-50%)",
+            maxHeight: "calc(100vh - 120px)",
             width: historyPanelOpen ? "272px" : "48px",
             zIndex: 55,
             background: historyPanelOpen ? "rgba(248,246,243,0.97)" : "transparent",
@@ -845,11 +846,10 @@ function Composer() {
         >
           {/* Rail icon */}
           <div style={{
-            padding: historyPanelOpen ? "14px 0 0 16px" : "14px 0 0 16px",
+            padding: "0 0 6px 16px",
             flexShrink: 0,
-            transition: "padding 0.3s ease",
           }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b5aca3" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#b5aca3" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" />
               <polyline points="12 6 12 12 16 14" />
             </svg>
@@ -860,7 +860,6 @@ function Composer() {
             flex: 1,
             overflowY: historyPanelOpen ? "auto" : "hidden",
             overflowX: "hidden",
-            paddingTop: "12px",
           }}>
             {(() => {
               const now = new Date()
