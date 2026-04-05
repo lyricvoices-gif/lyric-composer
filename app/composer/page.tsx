@@ -135,29 +135,100 @@ function NoPlanWall() {
   return null
 }
 
-function SignOutButton() {
+function ProfileDropdown() {
+  const [open, setOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
   async function handleSignOut() {
     const supabase = createClient()
     await supabase.auth.signOut()
     window.location.replace(MARKETING_URL)
   }
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return
+    function handleClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClick)
+    return () => document.removeEventListener("mousedown", handleClick)
+  }, [open])
+
   return (
-    <button
-      onClick={handleSignOut}
-      style={{
-        background: "#eae4de", border: "none", cursor: "pointer",
-        width: "28px", height: "28px", borderRadius: "50%",
-        display: "flex", alignItems: "center",
-        justifyContent: "center", flexShrink: 0,
-      }}
-      title="Sign out"
-    >
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#756d65" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-        <polyline points="16 17 21 12 16 7"/>
-        <line x1="21" y1="12" x2="9" y2="12"/>
-      </svg>
-    </button>
+    <div ref={dropdownRef} style={{ position: "relative" }}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="lyric-profile-btn"
+        style={{
+          background: "#eae4de", border: "none", cursor: "pointer",
+          width: "28px", height: "28px", borderRadius: "50%",
+          display: "flex", alignItems: "center",
+          justifyContent: "center", flexShrink: 0,
+          transition: "background 0.15s",
+        }}
+        title="Account"
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#756d65" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+          <circle cx="12" cy="7" r="4" />
+        </svg>
+      </button>
+
+      {open && (
+        <div style={{
+          position: "absolute",
+          top: "calc(100% + 8px)",
+          right: 0,
+          width: "180px",
+          background: "#ffffff",
+          border: "1px solid #eae4de",
+          borderRadius: "12px",
+          boxShadow: "0 8px 24px rgba(42,38,34,0.1)",
+          padding: "6px",
+          zIndex: 200,
+        }}>
+          <a
+            href="/upgrade"
+            className="lyric-dropdown-item"
+            style={{
+              display: "flex", alignItems: "center", gap: "10px",
+              padding: "10px 12px", borderRadius: "8px",
+              fontSize: "13px", color: "#2a2622",
+              textDecoration: "none", cursor: "pointer",
+              transition: "background 0.12s",
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#756d65" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            Settings
+          </a>
+          <button
+            onClick={handleSignOut}
+            className="lyric-dropdown-item"
+            style={{
+              display: "flex", alignItems: "center", gap: "10px",
+              padding: "10px 12px", borderRadius: "8px",
+              fontSize: "13px", color: "#2a2622",
+              background: "none", border: "none", width: "100%",
+              textAlign: "left", cursor: "pointer",
+              transition: "background 0.12s",
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#756d65" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            Sign out
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -172,7 +243,7 @@ function TutorialButton() {
         justifyContent: "center", flexShrink: 0,
         textDecoration: "none",
       }}
-      title="Voice setup guide"
+      title="Tutorial"
     >
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#756d65" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" />
@@ -565,6 +636,8 @@ function Composer() {
         [contenteditable]:focus { outline: none; }
         .lyric-action-btn:hover:not(:disabled) { background: #e4e0db !important; }
         .lyric-action-btn-inv:hover:not(:disabled) { background: rgba(248,246,243,0.08) !important; }
+        .lyric-profile-btn:hover { background: #e0dbd5 !important; }
+        .lyric-dropdown-item:hover { background: #f5f3ef !important; }
         .lyric-toolbar-row { scrollbar-width: none; }
         .lyric-toolbar-row::-webkit-scrollbar { display: none; }
         .lyric-voice-panel-scroll { scrollbar-width: none; }
@@ -620,7 +693,7 @@ function Composer() {
             </>
           )}
           <TutorialButton />
-          <SignOutButton />
+          <ProfileDropdown />
         </div>
       </header>
 
