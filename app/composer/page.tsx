@@ -830,9 +830,8 @@ function Composer() {
           style={{
             position: "fixed",
             left: 0,
-            top: "50%",
-            transform: "translateY(-50%)",
-            maxHeight: "calc(100vh - 120px)",
+            top: "52px",
+            bottom: 0,
             width: historyPanelOpen ? "272px" : "48px",
             zIndex: 55,
             background: historyPanelOpen ? "rgba(248,246,243,0.97)" : "transparent",
@@ -844,10 +843,11 @@ function Composer() {
             overflow: "hidden",
           }}
         >
-          {/* Rail icon */}
+          {/* Rail icon — top-aligned with voice panel */}
           <div style={{
             padding: "0 0 6px 16px",
             flexShrink: 0,
+            marginTop: "max(0px, calc(50vh - 52px - 300px))",
           }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#b5aca3" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" />
