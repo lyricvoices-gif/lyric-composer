@@ -81,47 +81,49 @@ interface GenerateRequest {
  * embodies that posture.
  */
 const EMOTION_DESCRIPTIONS: Record<string, string> = {
-  // Per-voice emotions — phrased to preserve voice identity
-  calm:           "calm, steady, preserving natural voice quality",
-  determined:     "determined, resolute, natural voice with conviction",
-  focused:        "focused, precise, maintaining natural timbre",
-  reflective:     "reflective, thoughtful, gentle introspection",
-  confident:      "confident, assured, naturally self-possessed",
-  serene:         "serene, peaceful, soft warmth",
-  tender:         "tender, gentle, warmly intimate",
-  hopeful:        "hopeful, gently uplifted, natural warmth",
-  empathetic:     "empathetic, caring, genuine warmth",
-  soothing:       "soothing, gentle, softly reassuring",
-  nurturing:      "nurturing, warm, gently supportive",
-  contemplative:  "contemplative, quietly thoughtful",
-  grounded:       "grounded, steady, natural composure",
-  resilient:      "resilient, quietly strong, composed",
-  curious:        "curious, engaged, natural inquisitiveness",
-  playful:        "playful, lightly spirited, natural charm",
-  witty:          "witty, clever, naturally sharp",
-  bold:           "bold, energetic, commanding presence",
-  edgy:           "edgy, raw, intensely authentic",
-  provocative:    "provocative, daring, controlled intensity",
-  irreverent:     "irreverent, casually defiant, natural swagger",
-  adventurous:    "adventurous, spirited, vivid energy",
-  dramatic:       "dramatic, measured intensity, natural gravitas",
-  mysterious:     "mysterious, intriguing, low allure",
-  cinematic:      "cinematic, sweeping, epic natural presence",
-  suspenseful:    "suspenseful, taut, restrained tension",
-  wistful:        "wistful, bittersweet, gentle longing",
-  commanding:     "commanding, authoritative, natural leadership",
-  inspiring:      "inspiring, uplifting, earnest conviction",
-  conversational: "conversational, natural, relaxed and genuine",
+  // Per-voice emotions — phrased to preserve voice identity.
+  // Each instruction includes "begin speaking immediately" to suppress
+  // filler words, breaths, or vocal lead-ins the model sometimes adds.
+  calm:           "Calm and steady. Begin speaking immediately, no lead-in.",
+  determined:     "Determined and resolute with conviction. Begin speaking immediately.",
+  focused:        "Focused and precise. Begin speaking immediately, direct onset.",
+  reflective:     "Reflective and thoughtful, gentle introspection. Start speaking immediately.",
+  confident:      "Confident and assured. Begin speaking immediately, no hesitation.",
+  serene:         "Serene and peaceful with soft warmth. Begin speaking immediately.",
+  tender:         "Tender and gentle, warmly intimate. Start the line immediately.",
+  hopeful:        "Hopeful and gently uplifted. Begin speaking immediately.",
+  empathetic:     "Empathetic and caring with genuine warmth. Start immediately.",
+  soothing:       "Soothing and gentle, softly reassuring. Begin speaking immediately.",
+  nurturing:      "Nurturing and warm, gently supportive. Start the line immediately.",
+  contemplative:  "Contemplative and quietly thoughtful. Begin speaking immediately.",
+  grounded:       "Grounded and steady with natural composure. Start immediately.",
+  resilient:      "Resilient and quietly strong. Begin speaking immediately.",
+  curious:        "Curious and engaged. Begin speaking immediately, no filler.",
+  playful:        "Playful and lightly spirited. Start the line immediately.",
+  witty:          "Witty and clever, naturally sharp. Begin speaking immediately.",
+  bold:           "Bold and energetic with commanding presence. Start immediately.",
+  edgy:           "Edgy and raw, intensely authentic. Begin speaking immediately.",
+  provocative:    "Provocative and daring. Begin speaking immediately, no lead-in.",
+  irreverent:     "Irreverent and casually defiant. Start the line immediately.",
+  adventurous:    "Adventurous and spirited with vivid energy. Begin immediately.",
+  dramatic:       "Dramatic with measured intensity. Begin speaking immediately.",
+  mysterious:     "Mysterious and intriguing, low allure. Start immediately, no preamble.",
+  cinematic:      "Cinematic and sweeping with epic presence. Begin speaking immediately.",
+  suspenseful:    "Suspenseful and taut with restrained tension. Start immediately, no filler.",
+  wistful:        "Wistful and bittersweet, gentle longing. Begin speaking immediately.",
+  commanding:     "Commanding and authoritative. Start the line immediately.",
+  inspiring:      "Inspiring and uplifting with earnest conviction. Begin immediately.",
+  conversational: "Conversational and relaxed. Begin speaking immediately, natural.",
   // Additional per-voice emotions from voiceData palette
-  amused:         "amused, lightly entertained, warm natural humor",
-  awe:            "awe, wonderstruck, breathless reverence",
-  defiant:        "defiant, unyielding, controlled resistance",
-  excited:        "excited, energized, vibrant natural enthusiasm",
-  melancholic:    "melancholic, deeply wistful, soft sorrow",
-  proud:          "proud, quietly dignified, natural self-assurance",
-  serious:        "serious, measured, weighty composure",
-  somber:         "somber, subdued, grave sincerity",
-  tense:          "tense, restrained urgency, controlled edge",
+  amused:         "Amused and lightly entertained. Begin speaking immediately.",
+  awe:            "Awestruck with breathless reverence. Start the line immediately.",
+  defiant:        "Defiant and unyielding. Begin speaking immediately, no hesitation.",
+  excited:        "Excited and energized with vibrant enthusiasm. Start immediately.",
+  melancholic:    "Melancholic and deeply wistful. Begin speaking immediately, no lead-in.",
+  proud:          "Proud and quietly dignified. Begin speaking immediately.",
+  serious:        "Serious and measured with weighty composure. Start immediately.",
+  somber:         "Somber and subdued with grave sincerity. Begin speaking immediately.",
+  tense:          "Tense with restrained urgency. Begin speaking immediately, no filler.",
 }
 
 /**
@@ -151,7 +153,7 @@ function enrichSegments(
     const key = token.toLowerCase()
     const desc =
       EMOTION_DESCRIPTIONS[key] ??
-      `${token.toLowerCase()}, natural delivery, preserving original voice`
+      `${token.toLowerCase()}, natural delivery. Begin speaking immediately, no filler.`
 
     return { ...seg, intent: desc }
   })

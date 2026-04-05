@@ -14,6 +14,138 @@ const MARKETING_URL = "https://lyric-marketing.vercel.app"
 // Inline direction marks are derived per-voice from palette.emotionGroups
 
 // ---------------------------------------------------------------------------
+// Audio: trim leading silence / filler from generated audio
+// ---------------------------------------------------------------------------
+
+/**
+ * Trims leading silence and short filler sounds (breaths, "um"s) from
+ * generated audio using the Web Audio API.
+ *
+ * Strategy: scan the first 1.5s in 20ms windows.  Skip past any initial
+ * silence (RMS < silenceThreshold), then check if the first burst of
+ * sound is a short filler (< fillerMaxMs) followed by another quiet gap.
+ * If so, trim up to the start of the real speech.
+ *
+ * Falls back to the original blob if decoding fails.
+ */
+async function trimLeadingSilence(
+  blob: Blob,
+  {
+    silenceThreshold = 0.008,
+    speechThreshold  = 0.03,
+    fillerMaxMs      = 400,
+    maxScanSecs      = 1.5,
+  } = {}
+): Promise<Blob> {
+  try {
+    const ctx = new OfflineAudioContext(1, 1, 44100)
+    const arrayBuf = await blob.arrayBuffer()
+    const decoded = await ctx.decodeAudioData(arrayBuf)
+
+    const sr = decoded.sampleRate
+    const ch = decoded.getChannelData(0)
+    const windowSize = Math.floor(sr * 0.02) // 20ms windows
+    const maxScan = Math.min(Math.floor(maxScanSecs * sr), ch.length)
+
+    // Compute RMS for a window starting at sample index
+    function rms(start: number): number {
+      let sum = 0
+      const end = Math.min(start + windowSize, ch.length)
+      for (let j = start; j < end; j++) sum += ch[j] * ch[j]
+      return Math.sqrt(sum / (end - start))
+    }
+
+    // Phase 1: skip leading silence
+    let i = 0
+    while (i < maxScan && rms(i) < silenceThreshold) i += windowSize
+
+    // Phase 2: check if initial sound burst is a short filler
+    const firstSoundStart = i
+    const fillerMaxSamples = Math.floor((fillerMaxMs / 1000) * sr)
+
+    // Walk through the filler candidate
+    while (i < maxScan && i - firstSoundStart < fillerMaxSamples && rms(i) >= silenceThreshold) {
+      i += windowSize
+    }
+
+    // If we're still within filler window and hit a quiet gap, this was a filler
+    if (i - firstSoundStart < fillerMaxSamples && i < maxScan && rms(i) < silenceThreshold) {
+      // Skip the quiet gap after the filler
+      while (i < maxScan && rms(i) < silenceThreshold) i += windowSize
+      // Now i points to the start of real speech
+    } else {
+      // Not a filler — the first sound was real speech
+      i = firstSoundStart
+    }
+
+    // Only trim if we found sustained speech (RMS above speechThreshold)
+    if (i > 0 && i < maxScan && rms(i) >= speechThreshold) {
+      // Back up a tiny bit (~10ms) so the onset isn't clipped
+      const backoff = Math.floor(sr * 0.01)
+      const trimStart = Math.max(0, i - backoff)
+      const trimmedLen = decoded.length - trimStart
+      const wavBuf = encodeWav(decoded, trimStart, trimmedLen, decoded.numberOfChannels, sr)
+      return new Blob([wavBuf], { type: "audio/wav" })
+    }
+
+    return blob
+  } catch {
+    return blob
+  }
+}
+
+/** Encode PCM samples to a WAV ArrayBuffer */
+function encodeWav(
+  buffer: AudioBuffer,
+  startSample: number,
+  length: number,
+  numChannels: number,
+  sampleRate: number
+): ArrayBuffer {
+  const bytesPerSample = 2 // 16-bit
+  const dataSize = length * numChannels * bytesPerSample
+  const headerSize = 44
+  const wav = new ArrayBuffer(headerSize + dataSize)
+  const view = new DataView(wav)
+
+  // RIFF header
+  writeString(view, 0, "RIFF")
+  view.setUint32(4, 36 + dataSize, true)
+  writeString(view, 8, "WAVE")
+
+  // fmt  chunk
+  writeString(view, 12, "fmt ")
+  view.setUint32(16, 16, true) // chunk size
+  view.setUint16(20, 1, true) // PCM
+  view.setUint16(22, numChannels, true)
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * numChannels * bytesPerSample, true)
+  view.setUint16(32, numChannels * bytesPerSample, true)
+  view.setUint16(34, 16, true) // bits per sample
+
+  // data chunk
+  writeString(view, 36, "data")
+  view.setUint32(40, dataSize, true)
+
+  let offset = headerSize
+  for (let i = 0; i < length; i++) {
+    for (let ch = 0; ch < numChannels; ch++) {
+      const sample = buffer.getChannelData(ch)[startSample + i]
+      const clamped = Math.max(-1, Math.min(1, sample))
+      view.setInt16(offset, clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff, true)
+      offset += 2
+    }
+  }
+  return wav
+}
+
+function writeString(view: DataView, offset: number, str: string) {
+  for (let i = 0; i < str.length; i++) {
+    view.setUint8(offset + i, str.charCodeAt(i))
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -506,7 +638,9 @@ function Composer() {
         throw new Error(err.error ?? `Generation failed (${res.status})`)
       }
 
-      const blob = await res.blob()
+      const rawBlob = await res.blob()
+      // Trim leading silence/filler that Hume sometimes prepends
+      const blob = await trimLeadingSilence(rawBlob)
       if (audioUrl) URL.revokeObjectURL(audioUrl)
       const url = URL.createObjectURL(blob)
       setAudioBlob(blob)
