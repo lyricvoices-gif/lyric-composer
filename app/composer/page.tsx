@@ -325,6 +325,7 @@ function Composer() {
   const [compositions, setCompositions] = useState<Composition[]>([])
   const [loadingCompositions, setLoadingCompositions] = useState(false)
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false)
+  const [currentCompositionId, setCurrentCompositionId] = useState<string | null>(null)
 
   const scriptAreaRef = useRef<HTMLDivElement>(null)
 
@@ -426,19 +427,33 @@ function Composer() {
   // ---------------------------------------------------------------------------
 
   async function saveComposition() {
-    await fetch("/api/compositions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        voiceId: activeVoice.id,
-        variant: activeVariant,
-        script: assembledScript,
-        directions: paragraphs,
-        audioUrl: null,
-        durationS: duration > 0 ? Math.round(duration) : null,
-        title: paragraphs[0]?.text.slice(0, 60) || null,
-      }),
-    })
+    const payload = {
+      voiceId: activeVoice.id,
+      variant: activeVariant,
+      script: assembledScript,
+      directions: paragraphs,
+      audioUrl: null,
+      durationS: duration > 0 ? Math.round(duration) : null,
+      title: paragraphs[0]?.text.slice(0, 60) || null,
+    }
+
+    if (currentCompositionId) {
+      // Update existing composition
+      await fetch(`/api/compositions/${currentCompositionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+    } else {
+      // Create new composition
+      const res = await fetch("/api/compositions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      if (data.id) setCurrentCompositionId(data.id)
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -573,6 +588,7 @@ function Composer() {
     }
     setAudioUrl(null); setAudioBlob(null); setIsPlaying(false)
     setCurrentTime(0); setDuration(0); setGenerationError(null)
+    setCurrentCompositionId(comp.id)
   }
 
   function handleNewComposition() {
@@ -580,6 +596,7 @@ function Composer() {
     setParagraphs([{ id: crypto.randomUUID(), text: "", direction: activeVariant, marks: [] }])
     setAudioUrl(null); setAudioBlob(null); setIsPlaying(false)
     setCurrentTime(0); setDuration(0); setGenerationError(null)
+    setCurrentCompositionId(null)
   }
 
   // ---------------------------------------------------------------------------

@@ -7,8 +7,8 @@ function db() {
   return neon(url)
 }
 
-export async function DELETE(
-  _req: Request,
+export async function PATCH(
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<Response> {
   const supabase = await createClient()
@@ -16,10 +16,41 @@ export async function DELETE(
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 })
 
   const { id } = await params
+
+  let body: {
+    voiceId?: string
+    variant?: string
+    script?: string
+    directions?: unknown
+    audioUrl?: string
+    durationS?: number
+    title?: string
+  }
+  try {
+    body = await req.json()
+  } catch {
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 })
+  }
+
+  const { voiceId, variant, script, directions, durationS, title } = body
+
   const sql = db()
   const rows = await sql`
-    DELETE FROM compositions WHERE id = ${id} AND user_id = ${user.id} RETURNING id
+    UPDATE compositions
+    SET
+      voice_id    = COALESCE(${voiceId ?? null}, voice_id),
+      variant     = COALESCE(${variant ?? null}, variant),
+      script      = COALESCE(${script ?? null}, script),
+      directions  = COALESCE(${directions ? JSON.stringify(directions) : null}, directions),
+      duration_s  = COALESCE(${durationS ?? null}, duration_s),
+      title       = COALESCE(${title ?? null}, title)
+    WHERE id = ${id} AND user_id = ${user.id}
+    RETURNING id
   `
-  if (rows.length === 0) return Response.json({ error: "Not found" }, { status: 404 })
-  return new Response(null, { status: 204 })
+
+  if (rows.length === 0) {
+    return Response.json({ error: "Composition not found" }, { status: 404 })
+  }
+
+  return Response.json(rows[0])
 }
