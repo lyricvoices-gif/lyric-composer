@@ -14,13 +14,16 @@ export async function GET(): Promise<Response> {
 
   const sql = db()
   const rows = await sql`
-    SELECT id, created_at, voice_id, variant, script, directions, audio_url, duration_s, title
+    SELECT DISTINCT ON (script) id, created_at, voice_id, variant, script, directions, audio_url, duration_s, title
     FROM compositions
     WHERE user_id = ${user.id}
-    ORDER BY created_at DESC
-    LIMIT 50
+    ORDER BY script, created_at DESC
   `
-  return Response.json(rows)
+  // Re-sort by created_at DESC after deduplication
+  rows.sort((a: Record<string, unknown>, b: Record<string, unknown>) =>
+    new Date(b.created_at as string).getTime() - new Date(a.created_at as string).getTime()
+  )
+  return Response.json(rows.slice(0, 50))
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -49,6 +52,30 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const sql = db()
+
+  // Check if a composition with the same script already exists for this user
+  const existing = await sql`
+    SELECT id FROM compositions
+    WHERE user_id = ${user.id} AND script = ${script}
+    ORDER BY created_at DESC
+    LIMIT 1
+  `
+
+  if (existing.length > 0) {
+    // Update the existing composition instead of creating a duplicate
+    const existingId = existing[0].id
+    await sql`
+      UPDATE compositions
+      SET voice_id   = ${voiceId},
+          variant    = ${variant},
+          directions = ${directions ? JSON.stringify(directions) : null},
+          duration_s = ${durationS ?? null},
+          title      = ${title ?? null}
+      WHERE id = ${existingId} AND user_id = ${user.id}
+    `
+    return Response.json({ id: existingId, created_at: null, updated: true }, { status: 200 })
+  }
+
   const rows = await sql`
     INSERT INTO compositions (user_id, voice_id, variant, script, directions, audio_url, duration_s, title)
     VALUES (

@@ -326,6 +326,7 @@ function Composer() {
   const [loadingCompositions, setLoadingCompositions] = useState(false)
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false)
   const [currentCompositionId, setCurrentCompositionId] = useState<string | null>(null)
+  const saveInFlightRef = useRef<Promise<void> | null>(null)
 
   const scriptAreaRef = useRef<HTMLDivElement>(null)
 
@@ -426,32 +427,53 @@ function Composer() {
   // ---------------------------------------------------------------------------
 
   async function saveComposition() {
-    const payload = {
-      voiceId: activeVoice.id,
-      variant: activeVariant,
-      script: assembledScript,
-      directions: paragraphs,
-      audioUrl: null,
-      durationS: duration > 0 ? Math.round(duration) : null,
-      title: paragraphs[0]?.text.slice(0, 60) || null,
+    // Wait for any in-flight save to finish before starting a new one.
+    // This prevents duplicate POSTs when generate() is called rapidly.
+    if (saveInFlightRef.current) {
+      await saveInFlightRef.current
     }
 
-    if (currentCompositionId) {
-      // Update existing composition
-      await fetch(`/api/compositions/${currentCompositionId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-    } else {
-      // Create new composition
-      const res = await fetch("/api/compositions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-      const data = await res.json()
-      if (data.id) setCurrentCompositionId(data.id)
+    const doSave = async () => {
+      const payload = {
+        voiceId: activeVoice.id,
+        variant: activeVariant,
+        script: assembledScript,
+        directions: paragraphs,
+        audioUrl: null,
+        durationS: duration > 0 ? Math.round(duration) : null,
+        title: paragraphs[0]?.text.slice(0, 60) || null,
+      }
+
+      if (currentCompositionId) {
+        // Update existing composition
+        await fetch(`/api/compositions/${currentCompositionId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+      } else {
+        // Create or upsert composition (server deduplicates by script)
+        const res = await fetch("/api/compositions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+        const data = await res.json()
+        if (data.id) setCurrentCompositionId(data.id)
+      }
+
+      // Refresh history list after save
+      loadCompositions().catch(() => {})
+    }
+
+    const promise = doSave()
+    saveInFlightRef.current = promise
+    try {
+      await promise
+    } finally {
+      if (saveInFlightRef.current === promise) {
+        saveInFlightRef.current = null
+      }
     }
   }
 
