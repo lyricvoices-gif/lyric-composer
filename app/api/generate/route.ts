@@ -50,7 +50,10 @@ interface Direction {
 
 interface Segment {
   text: string
+  intent?: string
   emotion?: string
+  /** Enriched acting instruction for Hume — preserves original voice while layering emotion */
+  description?: string
 }
 
 interface GenerateRequest {
@@ -59,6 +62,95 @@ interface GenerateRequest {
   script: string
   direction: Direction
   segments: Segment[]
+}
+
+// ---------------------------------------------------------------------------
+// Voice-fidelity acting instructions
+// ---------------------------------------------------------------------------
+
+/**
+ * Maps bare emotion / intent tokens into Hume-compatible acting instructions
+ * that explicitly ask Octave to preserve the original voice's identity while
+ * layering the requested emotion *on top*.
+ *
+ * Best practices from the Hume docs:
+ *  - Keep descriptions concise (< 100 chars)
+ *  - Use precise emotions + delivery style
+ *  - Combine for nuance: emotion + voice-preservation cue
+ *
+ * When a segment carries one of the voice's variant intents ("Authoritative",
+ * "Warm", etc.) no description is added — the variant's humeModelId already
+ * embodies that posture.
+ */
+const EMOTION_DESCRIPTIONS: Record<string, string> = {
+  // Per-voice emotions — phrased to preserve voice identity
+  calm:           "calm, steady, preserving natural voice quality",
+  determined:     "determined, resolute, natural voice with conviction",
+  focused:        "focused, precise, maintaining natural timbre",
+  reflective:     "reflective, thoughtful, gentle introspection",
+  confident:      "confident, assured, naturally self-possessed",
+  serene:         "serene, peaceful, soft warmth",
+  tender:         "tender, gentle, warmly intimate",
+  hopeful:        "hopeful, gently uplifted, natural warmth",
+  empathetic:     "empathetic, caring, genuine warmth",
+  soothing:       "soothing, gentle, softly reassuring",
+  nurturing:      "nurturing, warm, gently supportive",
+  contemplative:  "contemplative, quietly thoughtful",
+  grounded:       "grounded, steady, natural composure",
+  resilient:      "resilient, quietly strong, composed",
+  curious:        "curious, engaged, natural inquisitiveness",
+  playful:        "playful, lightly spirited, natural charm",
+  witty:          "witty, clever, naturally sharp",
+  bold:           "bold, energetic, commanding presence",
+  edgy:           "edgy, raw, intensely authentic",
+  provocative:    "provocative, daring, controlled intensity",
+  irreverent:     "irreverent, casually defiant, natural swagger",
+  adventurous:    "adventurous, spirited, vivid energy",
+  dramatic:       "dramatic, measured intensity, natural gravitas",
+  mysterious:     "mysterious, intriguing, low allure",
+  cinematic:      "cinematic, sweeping, epic natural presence",
+  suspenseful:    "suspenseful, taut, restrained tension",
+  wistful:        "wistful, bittersweet, gentle longing",
+  commanding:     "commanding, authoritative, natural leadership",
+  inspiring:      "inspiring, uplifting, earnest conviction",
+  conversational: "conversational, natural, relaxed and genuine",
+  // Additional per-voice emotions from voiceData palette
+  amused:         "amused, lightly entertained, warm natural humor",
+  awe:            "awe, wonderstruck, breathless reverence",
+  defiant:        "defiant, unyielding, controlled resistance",
+  excited:        "excited, energized, vibrant natural enthusiasm",
+  melancholic:    "melancholic, deeply wistful, soft sorrow",
+  proud:          "proud, quietly dignified, natural self-assurance",
+  serious:        "serious, measured, weighty composure",
+  somber:         "somber, subdued, grave sincerity",
+  tense:          "tense, restrained urgency, controlled edge",
+}
+
+/**
+ * Enriches raw segments from the composer with voice-preserving
+ * acting instructions (description) for the Hume TTS API.
+ * Variant intents (matching the voice's registered intents) are left
+ * without a description — the humeModelId handles their posture.
+ */
+function enrichSegments(
+  segments: Segment[],
+  voiceIntents: string[]
+): Segment[] {
+  return segments.map((seg) => {
+    const token = seg.intent ?? seg.emotion
+    if (!token) return seg
+
+    // Variant intents are handled by the humeModelId — no description needed
+    if (voiceIntents.includes(token)) return seg
+
+    // Look up curated description; fall back to a generic voice-preserving instruction
+    const key = token.toLowerCase()
+    const desc =
+      EMOTION_DESCRIPTIONS[key] ??
+      `${token.toLowerCase()}, natural delivery, preserving original voice`
+
+    return { ...seg, description: desc }
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -186,12 +278,18 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   // ── 5. Forward to Cloudflare worker ───────────────────────────────────────
+  // Enrich segments with voice-preserving acting instructions so the worker
+  // can pass them as Hume `description` fields.  Variant intents (handled by
+  // humeModelId) are left untouched; emotion marks get concise descriptions
+  // that prioritise the original voice timbre.
+  const enrichedSegments = enrichSegments(segments ?? [], voice.intents)
+
   let workerRes: Response
   try {
     workerRes = await fetch(WORKER_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ voiceId, variant, script, direction, segments }),
+      body: JSON.stringify({ voiceId, variant, script, direction, segments: enrichedSegments }),
     })
   } catch (err) {
     console.error("[generate] Worker fetch failed:", err)
@@ -256,7 +354,8 @@ export async function POST(req: Request): Promise<Response> {
 function extractDirectionMarks(segments: Segment[]): string[] {
   const marks = new Set<string>()
   for (const seg of segments ?? []) {
-    if (seg.emotion) marks.add(seg.emotion)
+    const token = seg.intent ?? seg.emotion
+    if (token) marks.add(token)
   }
   return Array.from(marks)
 }
@@ -279,7 +378,7 @@ async function writeGenomeEvent(opts: {
   // Direction marks from segments
   const directionMarksUsed = extractDirectionMarks(segments)
   if (direction?.intent) directionMarksUsed.push(direction.intent)
-  const directionMarkCount = segments?.filter((s) => s.emotion).length ?? 0
+  const directionMarkCount = segments?.filter((s) => s.intent ?? s.emotion).length ?? 0
 
   // Session position — count of genome events for this user today + 1
   const posRows = await sql`
