@@ -14,31 +14,13 @@ const INPUT_BG = "rgba(255,255,255,0.06)"
 
 type Step = "input" | "otp"
 
-// Detects phone: starts with "+", or is mostly digits (7+ digits after stripping formatting)
-function isPhoneInput(value: string): boolean {
-  const trimmed = value.trim()
-  if (trimmed.startsWith("+")) return true
-  const digitsOnly = trimmed.replace(/[\s\-().]/g, "")
-  return /^\d{7,15}$/.test(digitsOnly)
-}
-
-// Normalise phone for Supabase: ensure it starts with +, default to +1 (US)
-function normalisePhone(value: string): string {
-  const trimmed = value.trim()
-  if (trimmed.startsWith("+")) return trimmed
-  const digitsOnly = trimmed.replace(/[\s\-().]/g, "")
-  return `+1${digitsOnly}`
-}
-
 export default function SignUpPage() {
   const router = useRouter()
   const [step, setStep] = useState<Step>("input")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Unified input (email or phone)
   const [credential, setCredential] = useState("")
-  const isPhone = isPhoneInput(credential)
 
   // OTP state
   const [otp, setOtp] = useState("")
@@ -61,7 +43,7 @@ export default function SignUpPage() {
     })
   }
 
-  // ── Email / Phone OTP ─────────────────────────────────────────────────────
+  // ── Email OTP ───────────────────────────────────────────────────────────────
   async function handleCredentialSubmit() {
     const value = credential.trim()
     if (!value) return
@@ -69,11 +51,10 @@ export default function SignUpPage() {
     setError(null)
     const supabase = createClient()
 
-    const otpPayload = isPhone
-      ? { phone: normalisePhone(value), options: { shouldCreateUser: true } }
-      : { email: value, options: { shouldCreateUser: true } }
-
-    const { error: otpError } = await supabase.auth.signInWithOtp(otpPayload)
+    const { error: otpError } = await supabase.auth.signInWithOtp({
+      email: value,
+      options: { shouldCreateUser: true },
+    })
     setLoading(false)
     if (otpError) {
       setError(otpError.message)
@@ -89,12 +70,11 @@ export default function SignUpPage() {
     setError(null)
     const supabase = createClient()
 
-    const value = credential.trim()
-    const verifyPayload = isPhone
-      ? { phone: normalisePhone(value), token: otp, type: "sms" as const }
-      : { email: value, token: otp, type: "email" as const }
-
-    const { error: verifyError } = await supabase.auth.verifyOtp(verifyPayload)
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      email: credential.trim(),
+      token: otp,
+      type: "email",
+    })
     if (verifyError) {
       setLoading(false)
       setError(verifyError.message)
@@ -189,12 +169,12 @@ export default function SignUpPage() {
                 <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.08)" }} />
               </div>
 
-              {/* Email / phone input */}
+              {/* Email input */}
               <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                 <input
                   className="auth-input"
-                  type={isPhone ? "tel" : "email"}
-                  placeholder="Email or phone number"
+                  type="email"
+                  placeholder="Email"
                   value={credential}
                   onChange={(e) => setCredential(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleCredentialSubmit()}
@@ -207,11 +187,6 @@ export default function SignUpPage() {
                     boxSizing: "border-box",
                   }}
                 />
-                {isPhone && !credential.trim().startsWith("+") && (
-                  <p style={{ fontSize: "11px", color: MUTED, margin: 0, lineHeight: 1.4 }}>
-                    US number detected. We will send your code to +1{credential.trim().replace(/[\s\-().]/g, "")}
-                  </p>
-                )}
                 <button
                   className="auth-gold"
                   onClick={handleCredentialSubmit}
