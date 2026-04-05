@@ -661,7 +661,8 @@ function Composer() {
         .lyric-history-strip::-webkit-scrollbar { display: none; }
         .lyric-history-strip { -ms-overflow-style: none; scrollbar-width: none; }
         .lyric-history-card:hover { border-color: #d4cfc9 !important; box-shadow: 0 2px 8px rgba(42,38,34,0.06) !important; }
-        .lyric-history-card:hover button { color: #9c958f !important; }
+        .lyric-history-card:hover .lyric-history-delete { opacity: 1 !important; color: #b5aca3 !important; }
+        .lyric-history-card:hover .lyric-history-delete:hover { color: #756d65 !important; }
         .lyric-history-card:active { transform: scale(0.98); }
         .lyric-panel-tab:hover { background: #f5f3ef !important; }
         .lyric-vp-card { transition: background 0.15s ease; }
@@ -820,85 +821,74 @@ function Composer() {
 
           {/* ── Inline history strip ────────────────────────────────────── */}
           {compositions.length > 0 && (
-            <div style={{ marginTop: "48px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                <span style={{
-                  fontSize: "10px", fontWeight: 600, letterSpacing: "0.12em",
-                  color: "#b5aca3", textTransform: "uppercase",
-                }}>
-                  Recent
-                </span>
-                <div style={{ flex: 1, height: "1px", background: "#eae4de" }} />
-              </div>
-              <div
-                className="lyric-history-strip"
-                style={{
-                  display: "flex",
-                  gap: "10px",
-                  overflowX: "auto",
-                  paddingBottom: "4px",
-                }}
-              >
-                {compositions.slice(0, 10).map((comp) => {
-                  const voice = voices.find((v) => v.id === comp.voice_id)
-                  const date = new Date(comp.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })
-                  const preview = comp.title ?? comp.script.slice(0, 50)
-                  return (
-                    <div
-                      key={comp.id}
-                      className="lyric-history-card"
-                      onClick={() => restoreComposition(comp)}
-                      style={{
-                        minWidth: "180px",
-                        maxWidth: "220px",
-                        borderRadius: "10px",
-                        border: "1px solid #eae4de",
-                        padding: "10px 12px",
-                        cursor: "pointer",
-                        flexShrink: 0,
-                        background: "#ffffff",
-                        transition: "border-color 0.15s, box-shadow 0.15s",
-                      }}
-                    >
-                      {voice && (
-                        <div style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "6px" }}>
-                          <div style={{
-                            width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
-                            background: `linear-gradient(135deg, ${voice.gradientFrom}, ${voice.gradientTo})`,
-                          }} />
-                          <span style={{ fontSize: "9px", fontWeight: 600, color: "#756d65", letterSpacing: "0.02em" }}>
-                            {voice.archetype}
-                          </span>
-                          <span style={{ fontSize: "9px", color: "#b5aca3" }}>
-                            {comp.variant}
-                          </span>
-                        </div>
-                      )}
-                      <p style={{
-                        fontSize: "11px", color: "#2a2622", margin: 0, lineHeight: 1.4,
-                        overflow: "hidden", textOverflow: "ellipsis",
-                        display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
-                      }}>
-                        {preview}
-                      </p>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "6px" }}>
-                        <span style={{ fontSize: "9px", color: "#b5aca3" }}>{date}</span>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); deleteComposition(comp.id) }}
-                          title="Delete"
-                          style={{
-                            background: "none", border: "none", color: "#d4cfc9",
-                            cursor: "pointer", fontSize: "14px", lineHeight: 1, padding: "2px",
-                            transition: "color 0.15s",
-                          }}
-                        >
-                          ×
-                        </button>
+            <div
+              className="lyric-history-strip"
+              style={{
+                display: "flex",
+                gap: "8px",
+                overflowX: "auto",
+                marginTop: "32px",
+                paddingBottom: "4px",
+              }}
+            >
+              {compositions.slice(0, 10).map((comp) => {
+                const voice = voices.find((v) => v.id === comp.voice_id)
+                const preview = comp.title ?? comp.script.slice(0, 40)
+                return (
+                  <div
+                    key={comp.id}
+                    className="lyric-history-card"
+                    onClick={() => restoreComposition(comp)}
+                    style={{
+                      minWidth: "160px",
+                      maxWidth: "200px",
+                      borderRadius: "10px",
+                      border: "1px solid #eae4de",
+                      padding: "10px 12px",
+                      cursor: "pointer",
+                      flexShrink: 0,
+                      background: "#ffffff",
+                      transition: "border-color 0.15s, box-shadow 0.15s",
+                      position: "relative",
+                    }}
+                  >
+                    {voice && (
+                      <div style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "5px" }}>
+                        <div style={{
+                          width: "7px", height: "7px", borderRadius: "50%", flexShrink: 0,
+                          background: `linear-gradient(135deg, ${voice.gradientFrom}, ${voice.gradientTo})`,
+                        }} />
+                        <span style={{ fontSize: "9px", fontWeight: 600, color: "#756d65", letterSpacing: "0.02em" }}>
+                          {voice.archetype}
+                        </span>
+                        <span style={{ fontSize: "9px", color: "#b5aca3" }}>
+                          {comp.variant}
+                        </span>
                       </div>
-                    </div>
-                  )
-                })}
-              </div>
+                    )}
+                    <p style={{
+                      fontSize: "11px", color: "#2a2622", margin: 0, lineHeight: 1.35,
+                      overflow: "hidden", textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}>
+                      {preview}
+                    </p>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteComposition(comp.id) }}
+                      title="Delete"
+                      style={{
+                        position: "absolute", top: "6px", right: "6px",
+                        background: "none", border: "none", color: "#d4cfc9",
+                        cursor: "pointer", fontSize: "12px", lineHeight: 1, padding: "2px",
+                        transition: "color 0.15s", opacity: 0,
+                      }}
+                      className="lyric-history-delete"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           )}
 
