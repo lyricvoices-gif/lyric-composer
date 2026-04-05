@@ -124,10 +124,9 @@ export default function OnboardingFlow({ isRevisit = false }: { isRevisit?: bool
 
   useEffect(() => {
     if (step !== 2) { setDemoPhase(0); return }
-    const t1 = setTimeout(() => setDemoPhase(1), 800)    // highlight appears
-    const t2 = setTimeout(() => setDemoPhase(2), 1800)   // emotion pill appears
-    const t3 = setTimeout(() => setDemoPhase(3), 3200)   // contrast section fades in
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
+    const t1 = setTimeout(() => setDemoPhase(1), 1200)   // highlight appears
+    const t2 = setTimeout(() => setDemoPhase(2), 2600)   // emotion pill appears
+    return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [step])
 
   function stopAudio() {
@@ -255,13 +254,13 @@ export default function OnboardingFlow({ isRevisit = false }: { isRevisit?: bool
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        padding: "48px 24px 96px",
+        padding: "0 24px",
         position: "relative",
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       }}>
         {/* Wordmark at top center */}
-        <div style={{ marginBottom: "40px", animation: "ob-fade-up 0.6s ease backwards" }}>
-          <Wordmark height={24} color={LIGHT} />
+        <div style={{ paddingTop: "48px", marginBottom: "24px", animation: "ob-fade-up 0.6s ease backwards" }}>
+          <Wordmark height={32} color={LIGHT} />
         </div>
 
         {/* Step dots */}
@@ -269,7 +268,7 @@ export default function OnboardingFlow({ isRevisit = false }: { isRevisit?: bool
           display: "flex",
           gap: "6px",
           alignItems: "center",
-          marginBottom: "56px",
+          marginBottom: "0",
           animation: "ob-fade-up 0.6s ease 0.1s backwards",
         }}>
           {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((n) => (
@@ -282,6 +281,17 @@ export default function OnboardingFlow({ isRevisit = false }: { isRevisit?: bool
             }} />
           ))}
         </div>
+
+        {/* Vertically centered content area */}
+        <div style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "100%",
+          paddingBottom: "120px",
+        }}>
 
         {/* ── Step 1: Welcome ──────────────────────────────────────────────── */}
         {step === 1 && (
@@ -332,7 +342,7 @@ export default function OnboardingFlow({ isRevisit = false }: { isRevisit?: bool
         {/* ── Step 2: Voice Direction Demo ────────────────────────────────── */}
         {step === 2 && (
           <StepContent stepKey={2}>
-            <div style={{ width: "100%", maxWidth: "560px" }}>
+            <div style={{ width: "100%", maxWidth: "480px", textAlign: "center" }}>
               <p style={{
                 fontFamily: "Agrandir, sans-serif",
                 fontSize: "11px",
@@ -349,15 +359,15 @@ export default function OnboardingFlow({ isRevisit = false }: { isRevisit?: bool
                 letterSpacing: "-0.02em",
                 margin: "0 0 8px",
               }}>
-                Direct your voice with emotion
+                Highlight. Direct. Listen.
               </h1>
               <p style={{
                 fontSize: "14px",
                 color: MUTED,
-                margin: "0 0 40px",
+                margin: "0 0 36px",
                 lineHeight: 1.5,
               }}>
-                Highlight any part of your script, then apply an emotion. The voice shapes its delivery to match.
+                Select a phrase in your script and apply an emotion. The voice shapes its delivery to match.
               </p>
 
               {/* Demo script area */}
@@ -366,20 +376,9 @@ export default function OnboardingFlow({ isRevisit = false }: { isRevisit?: bool
                 border: `1px solid ${BORDER}`,
                 borderRadius: "14px",
                 padding: "28px 24px",
-                marginBottom: "28px",
+                marginBottom: "32px",
+                textAlign: "left",
               }}>
-                {/* Label */}
-                <div style={{
-                  fontFamily: "Agrandir, sans-serif",
-                  fontSize: "10px",
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                  color: MUTED,
-                  marginBottom: "16px",
-                }}>
-                  Your script
-                </div>
-
                 {/* Demo sentence with animated highlight + emotion pill */}
                 <p style={{
                   fontSize: "16px",
@@ -393,148 +392,6 @@ export default function OnboardingFlow({ isRevisit = false }: { isRevisit?: bool
                     direction="Warmth"
                     visible={demoPhase >= 2}
                   />
-                </p>
-
-                {/* Disabled play preview */}
-                <div style={{
-                  marginTop: "20px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  opacity: demoPhase >= 2 ? 0.4 : 0,
-                  transition: "opacity 0.5s ease",
-                }}>
-                  <div style={{
-                    width: "32px",
-                    height: "32px",
-                    borderRadius: "50%",
-                    border: `1px solid ${BORDER_HOVER}`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}>
-                    <svg width="9" height="10" viewBox="0 0 10 12" fill={LIGHT}>
-                      <path d="M0 0L10 6L0 12V0Z" />
-                    </svg>
-                  </div>
-                  <span style={{ fontSize: "11px", color: MUTED }}>
-                    Preview coming soon
-                  </span>
-                </div>
-              </div>
-
-              {/* Contrast: phrase vs single word */}
-              <div style={{
-                opacity: demoPhase >= 3 ? 1 : 0,
-                transform: demoPhase >= 3 ? "translateY(0)" : "translateY(8px)",
-                transition: "opacity 0.6s ease, transform 0.6s ease",
-              }}>
-                <div style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "12px",
-                  marginBottom: "12px",
-                }}>
-                  {/* Single word */}
-                  <div style={{
-                    background: "rgba(245,243,239,0.03)",
-                    border: `1px solid ${BORDER}`,
-                    borderRadius: "10px",
-                    padding: "16px",
-                  }}>
-                    <div style={{
-                      fontFamily: "Agrandir, sans-serif",
-                      fontSize: "9px",
-                      letterSpacing: "0.1em",
-                      textTransform: "uppercase",
-                      color: "rgba(245,243,239,0.3)",
-                      marginBottom: "10px",
-                    }}>
-                      Single word
-                    </div>
-                    <p style={{ fontSize: "14px", lineHeight: 1.6, margin: 0, color: "rgba(245,243,239,0.5)" }}>
-                      <span style={{
-                        background: "rgba(184,149,90,0.08)",
-                        borderRadius: "3px",
-                        padding: "1px 0",
-                      }}>
-                        intentional
-                        <span style={{
-                          display: "inline-block",
-                          fontSize: "8px",
-                          background: "rgba(184,149,90,0.08)",
-                          border: `1px solid rgba(184,149,90,0.15)`,
-                          color: "rgba(201,169,110,0.4)",
-                          borderRadius: "100px",
-                          padding: "0 4px",
-                          marginLeft: "3px",
-                          verticalAlign: "middle",
-                          lineHeight: "1.7",
-                        }}>
-                          Warmth
-                        </span>
-                      </span>
-                    </p>
-                    <p style={{ fontSize: "11px", color: "rgba(245,243,239,0.25)", marginTop: "10px", marginBottom: 0, lineHeight: 1.4 }}>
-                      Less for the voice to shape
-                    </p>
-                  </div>
-
-                  {/* Full phrase */}
-                  <div style={{
-                    background: "rgba(201,169,110,0.04)",
-                    border: `1px solid rgba(201,169,110,0.2)`,
-                    borderRadius: "10px",
-                    padding: "16px",
-                  }}>
-                    <div style={{
-                      fontFamily: "Agrandir, sans-serif",
-                      fontSize: "9px",
-                      letterSpacing: "0.1em",
-                      textTransform: "uppercase",
-                      color: GOLD,
-                      marginBottom: "10px",
-                    }}>
-                      Full phrase
-                    </div>
-                    <p style={{ fontSize: "14px", lineHeight: 1.6, margin: 0, color: LIGHT }}>
-                      <span style={{
-                        background: MARK_BG,
-                        borderRadius: "3px",
-                        padding: "1px 0",
-                      }}>
-                        It is about sounding intentional.
-                        <span style={{
-                          display: "inline-block",
-                          fontSize: "8px",
-                          background: PILL_BG,
-                          border: `1px solid ${PILL_BORDER}`,
-                          color: PILL_COLOR,
-                          borderRadius: "100px",
-                          padding: "0 4px",
-                          marginLeft: "3px",
-                          verticalAlign: "middle",
-                          lineHeight: "1.7",
-                        }}>
-                          Warmth
-                        </span>
-                      </span>
-                    </p>
-                    <p style={{ fontSize: "11px", color: MUTED, marginTop: "10px", marginBottom: 0, lineHeight: 1.4 }}>
-                      Rich, expressive delivery
-                    </p>
-                  </div>
-                </div>
-
-                <p style={{
-                  fontSize: "12px",
-                  color: MUTED,
-                  textAlign: "center",
-                  margin: "0 0 32px",
-                  lineHeight: 1.5,
-                }}>
-                  Emotional direction shines with full phrases. Single words give the voice less to work with.
                 </p>
               </div>
 
@@ -552,8 +409,8 @@ export default function OnboardingFlow({ isRevisit = false }: { isRevisit?: bool
                   letterSpacing: "-0.01em",
                   border: "none",
                   cursor: "pointer",
-                  opacity: demoPhase >= 3 ? 1 : 0.4,
-                  pointerEvents: demoPhase >= 3 ? "auto" : "none",
+                  opacity: demoPhase >= 2 ? 1 : 0.4,
+                  pointerEvents: demoPhase >= 2 ? "auto" : "none",
                   transition: "opacity 0.4s ease",
                 }}
               >
@@ -913,6 +770,8 @@ export default function OnboardingFlow({ isRevisit = false }: { isRevisit?: bool
           </StepContent>
         )}
 
+        </div>{/* end vertically centered content area */}
+
         {/* Isotype footer anchor */}
         <div style={{
           position: "fixed",
@@ -920,7 +779,7 @@ export default function OnboardingFlow({ isRevisit = false }: { isRevisit?: bool
           left: "50%",
           transform: "translateX(-50%)",
         }}>
-          <Isotype height={26} color={LIGHT} opacity={0.18} />
+          <Isotype height={32} color="#ffffff" opacity={0.22} />
         </div>
       </div>
     </>

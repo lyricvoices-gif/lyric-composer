@@ -12,7 +12,7 @@ import {
 } from "@react-email/components"
 import * as React from "react"
 
-const ISOTOPE_SRC = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32"><path fill="#2b2a25" d="m8,16c0,4.42,3.58,8,8,8h8v-4h-8c-2.21,0-4-1.79-4-4v-4h-4v4Z"/><polygon fill="#2b2a25" points="24 16 24 8 12 8 12 12 20 12 20 16 24 16"/></svg>').toString('base64')}`
+const ISOTOPE_SRC = "https://composer.lyricvoices.ai/isotope-dark.svg"
 
 interface TrialWelcomeProps {
   firstName?: string
@@ -36,12 +36,12 @@ export default function TrialWelcome({ firstName, trialEndsAt }: TrialWelcomePro
           <Section style={content}>
             <Text style={heading}>Your trial is live.</Text>
             <Text style={paragraph}>
-              Hey {name} — welcome to Lyric. You have 7 days to explore the composer
+              Hey {name}, welcome to Lyric. You have 7 days to explore the composer
               and hear what intentional voice direction actually sounds like.
             </Text>
             <Text style={paragraph}>
               Five voices. Three tonal variants each. Direction presets that shape
-              how each line performs — not just what it says.
+              how each line performs, not just what it says.
             </Text>
           </Section>
 
