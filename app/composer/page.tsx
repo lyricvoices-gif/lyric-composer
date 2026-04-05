@@ -305,9 +305,10 @@ function Composer() {
   // Usage — optimistic client-side tracking
   const [usedToday, setUsedToday] = useState(0)
 
-  // History (inline strip)
+  // History panel (left side)
   const [compositions, setCompositions] = useState<Composition[]>([])
   const [loadingCompositions, setLoadingCompositions] = useState(false)
+  const [historyPanelOpen, setHistoryPanelOpen] = useState(false)
 
   const scriptAreaRef = useRef<HTMLDivElement>(null)
 
@@ -658,12 +659,9 @@ function Composer() {
         .lyric-toolbar-row::-webkit-scrollbar { display: none; }
         .lyric-voice-panel-scroll { scrollbar-width: none; }
         .lyric-voice-panel-scroll::-webkit-scrollbar { display: none; }
-        .lyric-history-strip::-webkit-scrollbar { display: none; }
-        .lyric-history-strip { -ms-overflow-style: none; scrollbar-width: none; }
-        .lyric-history-card:hover { border-color: #d4cfc9 !important; box-shadow: 0 2px 8px rgba(42,38,34,0.06) !important; }
-        .lyric-history-card:hover .lyric-history-delete { opacity: 1 !important; color: #b5aca3 !important; }
-        .lyric-history-card:hover .lyric-history-delete:hover { color: #756d65 !important; }
-        .lyric-history-card:active { transform: scale(0.98); }
+        .lyric-history-scroll { scrollbar-width: none; }
+        .lyric-history-scroll::-webkit-scrollbar { display: none; }
+        .lyric-history-item:hover { background: rgba(234,228,222,0.5) !important; }
         .lyric-panel-tab:hover { background: #f5f3ef !important; }
         .lyric-vp-card { transition: background 0.15s ease; }
         .lyric-vp-card:hover { background: rgba(234,228,222,0.5) !important; }
@@ -819,81 +817,148 @@ function Composer() {
             </span>
           </button>
 
-          {/* ── Inline history strip ────────────────────────────────────── */}
-          {compositions.length > 0 && (
-            <div
-              className="lyric-history-strip"
-              style={{
-                display: "flex",
-                gap: "8px",
-                overflowX: "auto",
-                marginTop: "32px",
-                paddingBottom: "4px",
-              }}
-            >
-              {compositions.slice(0, 10).map((comp) => {
-                const voice = voices.find((v) => v.id === comp.voice_id)
-                const preview = comp.title ?? comp.script.slice(0, 40)
-                return (
-                  <div
-                    key={comp.id}
-                    className="lyric-history-card"
-                    onClick={() => restoreComposition(comp)}
-                    style={{
-                      minWidth: "160px",
-                      maxWidth: "200px",
-                      borderRadius: "10px",
-                      border: "1px solid #eae4de",
-                      padding: "10px 12px",
-                      cursor: "pointer",
-                      flexShrink: 0,
-                      background: "#ffffff",
-                      transition: "border-color 0.15s, box-shadow 0.15s",
-                      position: "relative",
-                    }}
-                  >
-                    {voice && (
-                      <div style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "5px" }}>
-                        <div style={{
-                          width: "7px", height: "7px", borderRadius: "50%", flexShrink: 0,
-                          background: `linear-gradient(135deg, ${voice.gradientFrom}, ${voice.gradientTo})`,
-                        }} />
-                        <span style={{ fontSize: "9px", fontWeight: 600, color: "#756d65", letterSpacing: "0.02em" }}>
-                          {voice.archetype}
-                        </span>
-                        <span style={{ fontSize: "9px", color: "#b5aca3" }}>
-                          {comp.variant}
-                        </span>
-                      </div>
-                    )}
-                    <p style={{
-                      fontSize: "11px", color: "#2a2622", margin: 0, lineHeight: 1.35,
-                      overflow: "hidden", textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}>
-                      {preview}
-                    </p>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); deleteComposition(comp.id) }}
-                      title="Delete"
-                      style={{
-                        position: "absolute", top: "6px", right: "6px",
-                        background: "none", border: "none", color: "#d4cfc9",
-                        cursor: "pointer", fontSize: "12px", lineHeight: 1, padding: "2px",
-                        transition: "color 0.15s", opacity: 0,
-                      }}
-                      className="lyric-history-delete"
-                    >
-                      ×
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
         </div>
       </main>
+
+      {/* ── Floating History Panel (left side) ────────────────────────── */}
+      {compositions.length > 0 && (
+        <div
+          onMouseEnter={() => setHistoryPanelOpen(true)}
+          onMouseLeave={() => setHistoryPanelOpen(false)}
+          style={{
+            position: "fixed",
+            left: historyPanelOpen ? "0px" : "-260px",
+            top: "52px",
+            bottom: 0,
+            zIndex: 55,
+            display: "flex",
+            transition: "left 0.3s cubic-bezier(0.16,1,0.3,1)",
+          }}
+        >
+          {/* Panel body */}
+          <div style={{
+            width: "260px",
+            height: "100%",
+            background: "rgba(248,246,243,0.97)",
+            backdropFilter: "blur(16px)",
+            borderRight: "1px solid #eae4de",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            flexShrink: 0,
+          }}>
+            {/* Panel header */}
+            <div style={{
+              padding: "16px 16px 12px",
+              borderBottom: "1px solid #eae4de",
+              flexShrink: 0,
+            }}>
+              <span style={{
+                fontSize: "10px", fontWeight: 700, letterSpacing: "0.12em",
+                color: "#b5aca3", textTransform: "uppercase",
+              }}>
+                History
+              </span>
+            </div>
+
+            {/* Composition list (scrollable) */}
+            <div className="lyric-history-scroll" style={{
+              flex: 1,
+              overflowY: "auto",
+              padding: "4px 0",
+            }}>
+              {(() => {
+                const now = new Date()
+                const todayStr = now.toDateString()
+                const yesterday = new Date(now)
+                yesterday.setDate(yesterday.getDate() - 1)
+                const yesterdayStr = yesterday.toDateString()
+
+                let lastGroup = ""
+                return compositions.slice(0, 20).map((comp) => {
+                  const voice = voices.find((v) => v.id === comp.voice_id)
+                  const preview = comp.title ?? comp.script.slice(0, 60)
+                  const compDate = new Date(comp.created_at)
+                  const compDateStr = compDate.toDateString()
+                  let group = ""
+                  if (compDateStr === todayStr) group = "Today"
+                  else if (compDateStr === yesterdayStr) group = "Yesterday"
+                  else group = compDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })
+
+                  const showGroup = group !== lastGroup
+                  lastGroup = group
+
+                  return (
+                    <div key={comp.id}>
+                      {showGroup && (
+                        <div style={{
+                          padding: "12px 16px 4px",
+                          fontSize: "9px", fontWeight: 700, letterSpacing: "0.1em",
+                          color: "#b5aca3", textTransform: "uppercase",
+                        }}>
+                          {group}
+                        </div>
+                      )}
+                      <button
+                        className="lyric-history-item"
+                        onClick={() => { restoreComposition(comp); setHistoryPanelOpen(false) }}
+                        style={{
+                          width: "100%",
+                          display: "block",
+                          padding: "8px 16px",
+                          background: "transparent",
+                          border: "none",
+                          cursor: "pointer",
+                          textAlign: "left",
+                          transition: "background 0.12s",
+                        }}
+                      >
+                        <p style={{
+                          fontSize: "13px", color: "#2a2622", margin: 0, lineHeight: 1.4,
+                          overflow: "hidden", textOverflow: "ellipsis",
+                          display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+                        }}>
+                          {preview}
+                        </p>
+                      </button>
+                    </div>
+                  )
+                })
+              })()}
+            </div>
+          </div>
+
+          {/* Edge tab (always visible, attached to panel right edge) */}
+          <div
+            style={{
+              width: "20px",
+              height: "48px",
+              alignSelf: "center",
+              borderRadius: "0 8px 8px 0",
+              background: "rgba(248,246,243,0.92)",
+              border: "1px solid #eae4de",
+              borderLeft: "none",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+              cursor: "pointer",
+            }}
+            onClick={() => setHistoryPanelOpen(!historyPanelOpen)}
+          >
+            <svg
+              width="10" height="10" viewBox="0 0 24 24" fill="none"
+              stroke="#b5aca3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              style={{
+                transition: "transform 0.3s ease",
+                transform: historyPanelOpen ? "rotate(180deg)" : "rotate(0deg)",
+              }}
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </div>
+        </div>
+      )}
 
       {/* ── Floating Voice Panel (right side) ──────────────────────────── */}
       <div style={{
