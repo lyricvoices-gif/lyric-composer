@@ -52,8 +52,6 @@ interface Segment {
   text: string
   intent?: string
   emotion?: string
-  /** Enriched acting instruction for Hume — preserves original voice while layering emotion */
-  description?: string
 }
 
 interface GenerateRequest {
@@ -128,9 +126,15 @@ const EMOTION_DESCRIPTIONS: Record<string, string> = {
 
 /**
  * Enriches raw segments from the composer with voice-preserving
- * acting instructions (description) for the Hume TTS API.
- * Variant intents (matching the voice's registered intents) are left
- * without a description — the humeModelId handles their posture.
+ * acting instructions for the Hume TTS API.
+ *
+ * The Cloudflare worker uses `seg.intent` directly as the Hume `description`
+ * field when the intent doesn’t match a known variant. So we replace bare
+ * emotion tokens ("calm", "excited") with richer acting instructions that
+ * tell Octave to layer emotion while preserving the original voice identity.
+ *
+ * Variant intents ("Authoritative", "Warm", etc.) are left untouched — the
+ * worker resolves them to a humeModelId, and no description is sent.
  */
 function enrichSegments(
   segments: Segment[],
@@ -140,16 +144,16 @@ function enrichSegments(
     const token = seg.intent ?? seg.emotion
     if (!token) return seg
 
-    // Variant intents are handled by the humeModelId — no description needed
+    // Variant intents are handled by the humeModelId — leave as-is
     if (voiceIntents.includes(token)) return seg
 
-    // Look up curated description; fall back to a generic voice-preserving instruction
+    // Replace the bare emotion token with a richer acting instruction
     const key = token.toLowerCase()
     const desc =
       EMOTION_DESCRIPTIONS[key] ??
       `${token.toLowerCase()}, natural delivery, preserving original voice`
 
-    return { ...seg, description: desc }
+    return { ...seg, intent: desc }
   })
 }
 
@@ -278,10 +282,11 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   // ── 5. Forward to Cloudflare worker ───────────────────────────────────────
-  // Enrich segments with voice-preserving acting instructions so the worker
-  // can pass them as Hume `description` fields.  Variant intents (handled by
-  // humeModelId) are left untouched; emotion marks get concise descriptions
-  // that prioritise the original voice timbre.
+  // The worker uses seg.intent as the Hume `description` acting instruction
+  // when the intent doesn’t match a known variant.  Replace bare emotion
+  // tokens ("calm") with richer descriptions ("calm, steady, preserving
+  // natural voice quality") so Octave layers emotion while keeping the
+  // original voice’s identity intact.
   const enrichedSegments = enrichSegments(segments ?? [], voice.intents)
 
   let workerRes: Response
