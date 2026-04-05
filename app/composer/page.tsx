@@ -7,6 +7,7 @@ import { getAllVoices, VoiceDefinition } from "@/lib/voiceData"
 import { getPlanConfig, remainingGenerations, resolvePlanId, hasPaidPlan } from "@/lib/planConfig"
 import { Plus, Download, RotateCcw } from "lucide-react"
 import { trackGeneration, trackDownload, trackPreview } from "@/lib/analytics"
+import Wordmark from "@/components/Wordmark"
 
 const MARKETING_URL = "https://lyric-marketing.vercel.app"
 
@@ -161,7 +162,8 @@ function ProfileDropdown() {
     <div ref={dropdownRef} style={{ position: "relative" }}>
       <button
         onClick={() => setOpen(!open)}
-        className="lyric-profile-btn"
+        className={`lyric-profile-btn${!open ? " lyric-tip" : ""}`}
+        data-tip="Account"
         style={{
           background: "#eae4de", border: "none", cursor: "pointer",
           width: "28px", height: "28px", borderRadius: "50%",
@@ -169,7 +171,6 @@ function ProfileDropdown() {
           justifyContent: "center", flexShrink: 0,
           transition: "background 0.15s",
         }}
-        title="Account"
       >
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#756d65" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -236,14 +237,16 @@ function TutorialButton() {
   return (
     <a
       href="/onboarding?revisit=1"
+      className="lyric-tip lyric-header-icon"
+      data-tip="Tutorial"
       style={{
         background: "#eae4de", border: "none", cursor: "pointer",
         width: "28px", height: "28px", borderRadius: "50%",
         display: "flex", alignItems: "center",
         justifyContent: "center", flexShrink: 0,
         textDecoration: "none",
+        transition: "background 0.15s",
       }}
-      title="Tutorial"
     >
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#756d65" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" />
@@ -636,8 +639,21 @@ function Composer() {
         [contenteditable]:focus { outline: none; }
         .lyric-action-btn:hover:not(:disabled) { background: #e4e0db !important; }
         .lyric-action-btn-inv:hover:not(:disabled) { background: rgba(248,246,243,0.08) !important; }
+        .lyric-header-icon:hover { background: #e0dbd5 !important; }
         .lyric-profile-btn:hover { background: #e0dbd5 !important; }
         .lyric-dropdown-item:hover { background: #f5f3ef !important; }
+        .lyric-tip { position: relative; }
+        .lyric-tip::after {
+          content: attr(data-tip);
+          position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+          background: rgba(42,38,34,0.92); color: rgba(248,246,243,0.88);
+          font-size: 11px; font-weight: 400; letter-spacing: 0;
+          white-space: nowrap; padding: 5px 10px; border-radius: 6px;
+          pointer-events: none; opacity: 0; transition: opacity 0.15s ease;
+          z-index: 300; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .lyric-tip:hover::after { opacity: 1; }
+        .lyric-tip-up::after { top: auto; bottom: calc(100% + 8px); }
         .lyric-toolbar-row { scrollbar-width: none; }
         .lyric-toolbar-row::-webkit-scrollbar { display: none; }
         .lyric-voice-panel-scroll { scrollbar-width: none; }
@@ -647,7 +663,7 @@ function Composer() {
         .lyric-history-card:hover { border-color: #d4cfc9 !important; box-shadow: 0 2px 8px rgba(42,38,34,0.06) !important; }
         .lyric-history-card:hover button { color: #9c958f !important; }
         .lyric-history-card:active { transform: scale(0.98); }
-        .lyric-voices-fab:hover .lyric-voices-fab-circle { box-shadow: 0 4px 16px rgba(42,38,34,0.13) !important; border-color: #d4cfc9 !important; }
+        .lyric-panel-tab:hover { background: #f5f3ef !important; }
         .lyric-vp-card { transition: background 0.15s ease; }
         .lyric-vp-card:hover { background: rgba(234,228,222,0.5) !important; }
         .lyric-vp-expr { transition: background 0.12s ease; }
@@ -674,9 +690,7 @@ function Composer() {
         background: "rgba(248,246,243,0.96)", backdropFilter: "blur(16px)",
         borderBottom: "1px solid #eae4de",
       }}>
-        <span style={{ fontFamily: "Agrandir, sans-serif", fontSize: "15px", fontWeight: 400, letterSpacing: "0.04em", color: "#2a2622" }}>
-          lyric
-        </span>
+        <Wordmark height={32} color="#2a2622" />
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
           {isLoaded && (
             <>
@@ -894,28 +908,71 @@ function Composer() {
       {/* ── Floating Voice Panel (right side) ──────────────────────────── */}
       <div style={{
         position: "fixed",
-        right: voicePanelOpen ? "16px" : "-240px",
+        right: voicePanelOpen ? "16px" : "-282px",
         top: "50%",
         transform: "translateY(-50%)",
-        width: "280px",
-        maxHeight: "calc(100vh - 120px)",
-        background: "#ffffff",
-        border: "1px solid #eae4de",
-        borderRadius: "16px",
-        boxShadow: "0 8px 32px rgba(42,38,34,0.08)",
         zIndex: 60,
         display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
+        alignItems: "center",
         transition: "right 0.3s cubic-bezier(0.16,1,0.3,1)",
       }}>
+        {/* Edge tab handle (always visible, attached to panel left edge) */}
+        <button
+          className="lyric-panel-tab"
+          onClick={() => setVoicePanelOpen(!voicePanelOpen)}
+          style={{
+            width: "36px",
+            height: "72px",
+            borderRadius: "10px 0 0 10px",
+            background: "#ffffff",
+            border: "1px solid #eae4de",
+            borderRight: "none",
+            boxShadow: "-4px 0 12px rgba(42,38,34,0.05)",
+            cursor: "pointer",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "6px",
+            flexShrink: 0,
+            transition: "background 0.15s",
+          }}
+        >
+          <div style={{
+            width: "10px", height: "10px", borderRadius: "50%",
+            background: `linear-gradient(135deg, ${activeVoice.gradientFrom}, ${activeVoice.gradientTo})`,
+          }} />
+          <svg
+            width="12" height="12" viewBox="0 0 24 24" fill="none"
+            stroke="#756d65" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            style={{
+              transition: "transform 0.3s ease",
+              transform: voicePanelOpen ? "rotate(0deg)" : "rotate(180deg)",
+            }}
+          >
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+
+        {/* Panel body */}
+        <div style={{
+          width: "280px",
+          maxHeight: "calc(100vh - 120px)",
+          background: "#ffffff",
+          border: "1px solid #eae4de",
+          borderRadius: "16px",
+          boxShadow: "0 8px 32px rgba(42,38,34,0.08)",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          flexShrink: 0,
+        }}>
         {/* Panel header */}
         <div style={{
           padding: "16px 16px 12px",
           borderBottom: "1px solid #eae4de",
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
           flexShrink: 0,
         }}>
           <span style={{
@@ -924,19 +981,6 @@ function Composer() {
           }}>
             Edition 01
           </span>
-          <button
-            onClick={() => setVoicePanelOpen(false)}
-            style={{
-              background: "none", border: "none", cursor: "pointer",
-              color: "#b5aca3", display: "flex", padding: "2px",
-              transition: "color 0.15s",
-            }}
-            title="Collapse panel"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </button>
         </div>
 
         {/* Voice list (scrollable) */}
@@ -1071,51 +1115,10 @@ function Composer() {
             )
           })}
         </div>
-      </div>
+      </div>{/* end panel body */}
+      </div>{/* end outer wrapper */}
 
-      {/* Floating Voices button (visible when panel is collapsed) */}
-      {!voicePanelOpen && (
-        <button
-          className="lyric-voices-fab"
-          onClick={() => setVoicePanelOpen(true)}
-          title="Voices"
-          style={{
-            position: "fixed",
-            bottom: "32px",
-            right: "32px",
-            zIndex: 60,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "6px",
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
-          <div className="lyric-voices-fab-circle" style={{
-            width: "48px",
-            height: "48px",
-            borderRadius: "50%",
-            background: "#ffffff",
-            border: "1px solid #eae4de",
-            boxShadow: "0 2px 12px rgba(42,38,34,0.08)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            transition: "box-shadow 0.15s, border-color 0.15s",
-          }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2a2622" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 3v18" />
-              <path d="M8 8v8" />
-              <path d="M16 6v12" />
-              <path d="M4 11v2" />
-              <path d="M20 10v4" />
-            </svg>
-          </div>
-          <span style={{ fontSize: "10px", color: "#9c958f", fontWeight: 500 }}>Voices</span>
-        </button>
-      )}
+
 
       {/* ── Selection toolbar ────────────────────────────────────────────── */}
       {selectionInfo && (
@@ -1212,8 +1215,8 @@ function ActionButton({
     <button
       onClick={onClick}
       disabled={disabled}
-      title={title}
-      className={inverted ? "lyric-action-btn-inv" : "lyric-action-btn"}
+      data-tip={title}
+      className={`${inverted ? "lyric-action-btn-inv" : "lyric-action-btn"} lyric-tip${inverted ? " lyric-tip-up" : ""}`}
       style={{
         width: "40px", height: "40px", borderRadius: "8px",
         border: "none", background: "transparent",
