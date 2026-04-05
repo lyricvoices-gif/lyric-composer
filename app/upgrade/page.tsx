@@ -46,14 +46,22 @@ function UpgradeContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  // Check auth state
+  // Check auth state — if user already has an active plan, redirect to composer
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) {
         router.replace("/sign-up")
-      } else {
-        setHasAccount(true)
+        return
+      }
+      setHasAccount(true)
+
+      const meta = user.app_metadata ?? {}
+      const hasPlan = meta.plan_tier && meta.plan_tier !== "none" && meta.plan_tier !== "expired"
+      const hasTrial = meta.trial_ends_at && new Date(meta.trial_ends_at) > new Date()
+      if (hasPlan || hasTrial) {
+        const dest = meta.onboarding_complete ? "/composer" : "/onboarding"
+        router.replace(dest)
       }
     })
   }, [router])
