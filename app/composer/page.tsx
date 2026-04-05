@@ -710,7 +710,7 @@ function Composer() {
           pointer-events: none; user-select: none;
         }
         [data-placeholder]:empty::before {
-          content: attr(data-placeholder); color: #b5aca3; pointer-events: none; display: block;
+          content: attr(data-placeholder); color: #b5aca3; pointer-events: none; display: inline;
         }
         [data-placeholder]:empty::after {
           content: ""; display: inline-block; width: 1.5px; height: 1.1em;
