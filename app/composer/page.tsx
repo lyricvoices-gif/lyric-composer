@@ -719,14 +719,14 @@ function Composer() {
           <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "24px" }}>
             <ActionButton title="New composition" onClick={handleNewComposition}><Plus size={20} strokeWidth={1.5} /></ActionButton>
             <ActionButton
-              title={audioBlob ? "Download" : "Generate audio to download"}
+              title="Download audio"
               onClick={handleDownload}
               disabled={!audioBlob}
             >
               <Download size={20} strokeWidth={1.5} />
             </ActionButton>
             <ActionButton
-              title={canGenerate ? "Regenerate" : isAtLimit ? "Daily limit reached" : "Write a script to generate"}
+              title={isAtLimit ? "Daily limit reached" : "Regenerate audio"}
               onClick={generate}
               disabled={!canGenerate}
             >
