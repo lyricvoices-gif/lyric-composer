@@ -264,7 +264,7 @@ async function fetchStripeData() {
     const subscriptions = await stripe.subscriptions.list({
       status: "active",
       limit: 100,
-      expand: ["data.items.data.price.product"],
+      expand: ["data.items.data.price"],
     })
 
     let mrr = 0
@@ -276,12 +276,7 @@ async function fetchStripeData() {
         const amount = price.unit_amount ?? 0
         const interval = price.recurring?.interval
 
-        const product = price.product
-        const planName = (
-          (typeof product === "object" && product !== null && !("deleted" in product))
-            ? (product as Stripe.Product).name
-            : price.nickname
-        ) ?? price.id
+        const planName = price.nickname ?? price.id
 
         planCounts[planName] = (planCounts[planName] ?? 0) + 1
 
