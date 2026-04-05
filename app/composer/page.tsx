@@ -843,12 +843,24 @@ function Composer() {
             overflow: "hidden",
           }}
         >
+          {/* Rail icon */}
+          <div style={{
+            padding: historyPanelOpen ? "14px 0 0 16px" : "14px 0 0 16px",
+            flexShrink: 0,
+            transition: "padding 0.3s ease",
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b5aca3" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+          </div>
+
           {/* Scrollable content */}
           <div className="lyric-history-scroll" style={{
             flex: 1,
             overflowY: historyPanelOpen ? "auto" : "hidden",
             overflowX: "hidden",
-            paddingTop: "16px",
+            paddingTop: "12px",
           }}>
             {(() => {
               const now = new Date()
@@ -875,7 +887,7 @@ function Composer() {
                   <div key={comp.id}>
                     {showGroup && (
                       <div style={{
-                        padding: historyPanelOpen ? "14px 16px 6px" : "14px 0 6px",
+                        padding: historyPanelOpen ? "14px 16px 6px" : "14px 0 6px 16px",
                         fontSize: "9px", fontWeight: 700, letterSpacing: "0.1em",
                         color: "#b5aca3", textTransform: "uppercase",
                         whiteSpace: "nowrap",
@@ -895,11 +907,10 @@ function Composer() {
                         display: "flex",
                         alignItems: "center",
                         gap: "10px",
-                        padding: historyPanelOpen ? "7px 10px 7px 16px" : "7px 0",
-                        justifyContent: historyPanelOpen ? "flex-start" : "center",
+                        padding: historyPanelOpen ? "7px 10px 7px 16px" : "9px 0 9px 18px",
+                        justifyContent: "flex-start",
                         cursor: "pointer",
                         transition: "background 0.12s, padding 0.3s",
-                        borderRadius: historyPanelOpen ? "0" : "0",
                       }}
                     >
                       {/* Voice gradient dot — always visible */}
