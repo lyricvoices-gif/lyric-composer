@@ -81,6 +81,15 @@ export async function POST(req: Request): Promise<Response> {
     } catch (err) {
       console.error("[checkout] Failed to save stripe_customer_id:", err)
     }
+  } else {
+    // Sync current email to existing Stripe customer
+    try {
+      await stripe.customers.update(stripeCustomerId, {
+        email: email || undefined,
+      })
+    } catch (err) {
+      console.error("[checkout] Failed to sync email to Stripe customer:", err)
+    }
   }
 
   // Build the checkout session
