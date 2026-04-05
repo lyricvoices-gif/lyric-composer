@@ -262,12 +262,23 @@ function TutorialButton() {
 // ---------------------------------------------------------------------------
 
 function Composer() {
-  const { plan: planTier, isLoaded } = useCurrentUser()
+  const { plan: planTier, isLoaded, onboardingVoice, onboardingIntent } = useCurrentUser()
   const voices = getAllVoices()
 
-  // Voice & variant
+  // Voice & variant — default to onboarding selection if available
   const [activeVoice, setActiveVoice] = useState<VoiceDefinition>(voices[0])
   const [activeVariant, setActiveVariant] = useState<string>(voices[0].defaultIntent)
+  const [hasRestoredOnboardingVoice, setHasRestoredOnboardingVoice] = useState(false)
+
+  useEffect(() => {
+    if (hasRestoredOnboardingVoice || !isLoaded || !onboardingVoice) return
+    const match = voices.find((v) => v.id === onboardingVoice)
+    if (match) {
+      setActiveVoice(match)
+      setActiveVariant(onboardingIntent ?? match.defaultIntent)
+    }
+    setHasRestoredOnboardingVoice(true)
+  }, [isLoaded, onboardingVoice, onboardingIntent, voices, hasRestoredOnboardingVoice])
 
   // Paragraphs with inline marks
   const [paragraphs, setParagraphs] = useState<Paragraph[]>([

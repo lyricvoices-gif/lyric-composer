@@ -179,7 +179,7 @@ function UpgradeContent() {
           borderBottom: `1px solid ${BORDER}`,
         }}>
           <a href={MARKETING_URL} style={{ textDecoration: "none", display: "flex", alignItems: "center" }}>
-            <Wordmark height={24} color={LIGHT} />
+            <Wordmark height={32} color={LIGHT} />
           </a>
         </header>
 
@@ -238,7 +238,7 @@ function UpgradeContent() {
                   <li
                     key={feature}
                     style={{
-                      fontSize: "13px", color: LIGHT,
+                      fontSize: "15px", color: LIGHT,
                       display: "flex", alignItems: "center",
                       gap: "10px", lineHeight: 1.4,
                     }}
