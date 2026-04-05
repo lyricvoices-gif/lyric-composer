@@ -586,11 +586,25 @@ function Composer() {
     setLoadingCompositions(true)
     try {
       const res = await fetch("/api/compositions")
-      if (res.ok) setCompositions(await res.json())
+      if (res.ok) {
+        const data: Composition[] = await res.json()
+        setCompositions(data)
+
+        // If no current composition is set, try to match the current script
+        // to an existing composition so subsequent saves use PATCH (update)
+        // instead of POST (create), preventing duplicates after refresh.
+        if (!currentCompositionId && assembledScript.trim()) {
+          const match = data.find(
+            (c) => c.script.trim() === assembledScript.trim()
+          )
+          if (match) setCurrentCompositionId(match.id)
+        }
+      }
     } finally {
       setLoadingCompositions(false)
     }
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentCompositionId])
 
 
   async function deleteComposition(id: string) {

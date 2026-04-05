@@ -54,3 +54,26 @@ export async function PATCH(
 
   return Response.json(rows[0])
 }
+
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+): Promise<Response> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 })
+
+  const { id } = await params
+  const sql = db()
+  const rows = await sql`
+    DELETE FROM compositions
+    WHERE id = ${id} AND user_id = ${user.id}
+    RETURNING id
+  `
+
+  if (rows.length === 0) {
+    return Response.json({ error: "Composition not found" }, { status: 404 })
+  }
+
+  return Response.json({ deleted: true })
+}

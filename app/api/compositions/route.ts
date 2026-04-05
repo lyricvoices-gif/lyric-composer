@@ -13,11 +13,30 @@ export async function GET(): Promise<Response> {
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 })
 
   const sql = db()
+
+  // Clean up duplicate rows first — keep only the most recent per normalized script
+  await sql`
+    DELETE FROM compositions
+    WHERE id IN (
+      SELECT id FROM (
+        SELECT id,
+               ROW_NUMBER() OVER (
+                 PARTITION BY user_id, TRIM(BOTH FROM script)
+                 ORDER BY created_at DESC
+               ) AS rn
+        FROM compositions
+        WHERE user_id = ${user.id}
+      ) ranked
+      WHERE rn > 1
+    )
+  `
+
   const rows = await sql`
-    SELECT DISTINCT ON (script) id, created_at, voice_id, variant, script, directions, audio_url, duration_s, title
+    SELECT DISTINCT ON (TRIM(BOTH FROM script))
+      id, created_at, voice_id, variant, script, directions, audio_url, duration_s, title
     FROM compositions
     WHERE user_id = ${user.id}
-    ORDER BY script, created_at DESC
+    ORDER BY TRIM(BOTH FROM script), created_at DESC
   `
   // Re-sort by created_at DESC after deduplication
   rows.sort((a: Record<string, unknown>, b: Record<string, unknown>) =>
@@ -54,9 +73,10 @@ export async function POST(req: Request): Promise<Response> {
   const sql = db()
 
   // Check if a composition with the same script already exists for this user
+  // Normalize whitespace for comparison to avoid near-duplicates
   const existing = await sql`
     SELECT id FROM compositions
-    WHERE user_id = ${user.id} AND script = ${script}
+    WHERE user_id = ${user.id} AND TRIM(BOTH FROM script) = TRIM(BOTH FROM ${script})
     ORDER BY created_at DESC
     LIMIT 1
   `
