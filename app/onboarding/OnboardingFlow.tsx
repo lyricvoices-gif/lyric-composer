@@ -779,7 +779,7 @@ export default function OnboardingFlow({ isRevisit = false }: { isRevisit?: bool
           left: "50%",
           transform: "translateX(-50%)",
         }}>
-          <Isotype height={32} color="#ffffff" opacity={0.22} />
+          <Isotype height={32} color="#ffffff" opacity={1} />
         </div>
       </div>
     </>
