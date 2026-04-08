@@ -647,7 +647,9 @@ function Composer() {
       setAudioUrl(url)
       setCurrentTime(0)
       setUsedToday((n) => n + 1)
-      saveComposition().catch((err) => console.error("[auto-save]", err))
+      if (!currentCompositionId) {
+        saveComposition().catch((err) => console.error("[auto-save]", err))
+      }
 
       // Persist last-used voice for next session
       fetch("/api/onboarding", {
