@@ -1537,6 +1537,18 @@ function SelectionToolbar({
         boxShadow: "0 4px 16px rgba(0,0,0,0.24)",
       }}
     >
+      <div style={{
+        width: "100%",
+        fontSize: "9px",
+        fontWeight: 600,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        color: "rgba(250,249,247,0.4)",
+        marginBottom: "2px",
+        paddingLeft: "2px",
+      }}>
+        Add emotion
+      </div>
       {directionOptions.map((dir) => (
         <button
           key={dir}
