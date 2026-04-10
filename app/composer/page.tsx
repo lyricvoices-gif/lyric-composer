@@ -3,6 +3,7 @@
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 import { createClient } from "@/lib/supabase/client"
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react"
+import { useSearchParams } from "next/navigation"
 import { getAllVoices, VoiceDefinition } from "@/lib/voiceData"
 import { getPlanConfig, remainingGenerations, resolvePlanId, hasPaidPlan } from "@/lib/planConfig"
 import { Plus, Download, RotateCcw } from "lucide-react"
@@ -395,6 +396,7 @@ function TutorialButton() {
 
 function Composer() {
   const { plan: planTier, isLoaded, onboardingVoice, onboardingIntent, lastVoice, lastIntent } = useCurrentUser()
+  const searchParams = useSearchParams()
   const voices = getAllVoices()
 
   // Voice & variant — default to onboarding selection if available
@@ -404,9 +406,11 @@ function Composer() {
 
   useEffect(() => {
     if (hasRestoredOnboardingVoice || !isLoaded) return
-    // Priority: last-used voice > onboarding voice > default (voices[0])
-    const voiceId = lastVoice ?? onboardingVoice
-    const intent = lastIntent ?? onboardingIntent
+    // Priority: URL params (from onboarding redirect) > last-used > onboarding metadata > default
+    const urlVoice = searchParams.get("voice")
+    const urlVariant = searchParams.get("variant")
+    const voiceId = urlVoice ?? lastVoice ?? onboardingVoice
+    const intent = urlVariant ?? lastIntent ?? onboardingIntent
     if (voiceId) {
       const match = voices.find((v) => v.id === voiceId)
       if (match) {
@@ -415,7 +419,11 @@ function Composer() {
       }
     }
     setHasRestoredOnboardingVoice(true)
-  }, [isLoaded, lastVoice, lastIntent, onboardingVoice, onboardingIntent, voices, hasRestoredOnboardingVoice])
+    // Clean up URL params after reading (cosmetic — avoid ?voice=... lingering)
+    if (urlVoice && window.history.replaceState) {
+      window.history.replaceState({}, "", "/composer")
+    }
+  }, [isLoaded, lastVoice, lastIntent, onboardingVoice, onboardingIntent, voices, hasRestoredOnboardingVoice, searchParams])
 
   // Paragraphs with inline marks
   const [paragraphs, setParagraphs] = useState<Paragraph[]>([
@@ -848,12 +856,7 @@ function Composer() {
         [data-placeholder]:empty::before {
           content: attr(data-placeholder); color: #b5aca3; pointer-events: none; display: inline;
         }
-        [data-placeholder]:empty::after {
-          content: ""; display: inline-block; width: 1.5px; height: 1.1em;
-          background: #b5aca3; margin-left: 2px; vertical-align: text-bottom;
-          animation: lyric-blink 1s steps(2, start) infinite;
-        }
-        @keyframes lyric-blink { to { opacity: 0; } }
+        /* Native browser caret is used — no custom ::after cursor needed */
         [contenteditable]:focus { outline: none; }
         .lyric-action-btn:hover:not(:disabled) { background: #e4e0db !important; }
         .lyric-action-btn-inv:hover:not(:disabled) { background: rgba(248,246,243,0.08) !important; }
