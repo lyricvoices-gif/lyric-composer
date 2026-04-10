@@ -34,14 +34,14 @@ export default function TrialNudge({ firstName }: TrialNudgeProps) {
 
           <Section style={content}>
             <Text style={eyebrow}>2 days remaining</Text>
-            <Text style={heading}>Still haven&apos;t heard it?</Text>
+            <Text style={heading}>Your trial ends in 2 days.</Text>
             <Text style={paragraph}>
-              Hey {name}, your Lyric trial ends in 2 days. If you haven&apos;t
-              opened the composer yet, now&apos;s the time.
+              Hey {name}, your Lyric trial ends in 2 days. If you have not opened
+              the composer yet, this is a good time to try it.
             </Text>
             <Text style={paragraph}>
-              Try loading a line of copy you&apos;ve been struggling to make feel
-              right, and run it through Morgan or Nova. Direction changes everything.
+              Take a line of copy you have been working on and run it through Morgan
+              or Nova. Hearing how direction shapes delivery makes the difference clear.
             </Text>
           </Section>
 
@@ -53,8 +53,9 @@ export default function TrialNudge({ firstName }: TrialNudgeProps) {
 
           <Section style={content}>
             <Text style={hint}>
-              Your trial converts to Creator ($29/mo) in 2 days. No action needed
-              if you&apos;d like to continue. Cancel anytime in account settings.
+              Your trial converts to Creator ($29/mo) in 2 days. No action is needed
+              if you would like to continue. You can cancel anytime from your account
+              settings.
             </Text>
           </Section>
 

@@ -36,12 +36,13 @@ export default function PaymentFailed({ firstName }: PaymentFailedProps) {
             <Text style={eyebrow}>ACTION NEEDED</Text>
             <Text style={heading}>We couldn&apos;t process your payment.</Text>
             <Text style={paragraph}>
-              Hey {name}, your latest Lyric payment didn&apos;t go through. This
-              usually means an expired card or insufficient funds.
+              Hey {name}, your most recent Lyric payment was not processed
+              successfully. Common causes include an expired card or insufficient
+              funds.
             </Text>
             <Text style={paragraph}>
-              Update your payment method to keep your access active. If the issue
-              isn&apos;t resolved, your subscription will be paused.
+              Please update your payment method to keep your subscription active.
+              If the issue is not resolved, your access will be paused.
             </Text>
           </Section>
 

@@ -39,14 +39,15 @@ export default function SubscriptionConfirmed({
           <Hr style={divider} />
 
           <Section style={content}>
-            <Text style={eyebrow}>YOU&apos;RE IN</Text>
+            <Text style={eyebrow}>SUBSCRIPTION ACTIVE</Text>
             <Text style={heading}>Welcome to Lyric {planName}.</Text>
             <Text style={paragraph}>
               Hey {name}, your {planName} plan is now active. You were charged{" "}
-              {amount} today, and your subscription renews monthly from here.
+              {amount} today. Your subscription renews monthly.
             </Text>
             <Text style={paragraph}>
-              Every voice. Every direction preset. Every generation, yours to use.
+              You now have full access to every voice, every direction preset, and
+              every generation included in your plan.
             </Text>
           </Section>
 

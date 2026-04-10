@@ -37,12 +37,12 @@ export default function TrialConversion({ firstName }: TrialConversionProps) {
           <Section style={content}>
             <Text style={eyebrow}>Trial ends tomorrow</Text>
             <Text style={heading}>
-              Tomorrow you&apos;re in, or you&apos;re out.
+              Your trial converts to Creator tomorrow.
             </Text>
             <Text style={paragraph}>
-              Hey {name}, your Lyric trial converts to Creator ($29/mo) tomorrow.
-              If you want to keep the voices, no action needed. If not, cancel
-              before midnight in your account settings.
+              Hey {name}, your Lyric trial converts to the Creator plan ($29/mo)
+              tomorrow. No action is needed if you would like to continue. To
+              cancel, visit your account settings before the trial ends.
             </Text>
           </Section>
 
@@ -72,11 +72,11 @@ export default function TrialConversion({ firstName }: TrialConversionProps) {
 
           <Section style={{ textAlign: "center" as const, marginBottom: "28px" }}>
             <Text style={cancelLink}>
-              Want to cancel?{" "}
+              Need to cancel?{" "}
               <a href="https://composer.lyricvoices.ai" style={{ color: "#9c958f" }}>
-                Visit account settings
+                Visit your account settings
               </a>
-              {" "}before midnight tonight.
+              {" "}before tomorrow.
             </Text>
           </Section>
 

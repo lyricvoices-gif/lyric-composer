@@ -25,7 +25,7 @@ export default function TrialWelcome({ firstName, trialEndsAt }: TrialWelcomePro
   return (
     <Html>
       <Head />
-      <Preview>Your 7-day Lyric trial has started.</Preview>
+      <Preview>Your Lyric trial is now active.</Preview>
       <Body style={body}>
         <Container style={container}>
 
@@ -34,14 +34,14 @@ export default function TrialWelcome({ firstName, trialEndsAt }: TrialWelcomePro
           <Hr style={divider} />
 
           <Section style={content}>
-            <Text style={heading}>Your trial is live.</Text>
+            <Text style={heading}>Your trial is now active.</Text>
             <Text style={paragraph}>
               Hey {name}, welcome to Lyric. You have 7 days to explore the composer
-              and hear what intentional voice direction actually sounds like.
+              and hear what voice direction can do for your copy.
             </Text>
             <Text style={paragraph}>
               Five voices. Three tonal variants each. Direction presets that shape
-              how each line performs, not just what it says.
+              how each line sounds in delivery, not just on the page.
             </Text>
           </Section>
 
@@ -53,9 +53,9 @@ export default function TrialWelcome({ firstName, trialEndsAt }: TrialWelcomePro
 
           <Section style={content}>
             <Text style={hint}>
-              Your trial ends on {trialEndsAt}. After that, you'll be automatically
-              moved to the Creator plan ($29/mo). Cancel anytime before then from
-              your account settings.
+              Your trial ends on {trialEndsAt}. After that, your account will
+              automatically move to the Creator plan ($29/mo). You can cancel
+              anytime from your account settings.
             </Text>
           </Section>
 
