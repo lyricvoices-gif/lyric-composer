@@ -42,8 +42,11 @@ export default function AccountPage() {
   const hasActivePlan = !!plan
   const isEnterprise = plan === "enterprise"
 
+  const [cancelError, setCancelError] = useState<string | null>(null)
+
   async function handleCancel() {
     setCancelling(true)
+    setCancelError(null)
     try {
       const res = await fetch("/api/cancel-subscription", { method: "POST" })
       const data = await res.json()
@@ -55,12 +58,12 @@ export default function AccountPage() {
       } else {
         console.error("[account] Cancel failed:", data.error)
         setCancelling(false)
-        setShowConfirm(false)
+        setCancelError(data.error || "Something went wrong. Please try again.")
       }
     } catch (err) {
       console.error("[account] Cancel error:", err)
       setCancelling(false)
-      setShowConfirm(false)
+      setCancelError("Something went wrong. Please try again.")
     }
   }
 
@@ -265,6 +268,14 @@ export default function AccountPage() {
                     }}>
                       Are you sure? Your access will end immediately.
                     </p>
+                    {cancelError && (
+                      <p style={{
+                        fontSize: "12px", color: "#e5736a",
+                        margin: "0 0 12px", lineHeight: 1.5,
+                      }}>
+                        {cancelError}
+                      </p>
+                    )}
                     <div style={{ display: "flex", gap: "10px" }}>
                       <button
                         onClick={handleCancel}
@@ -284,7 +295,7 @@ export default function AccountPage() {
                         {cancelling ? "Cancelling\u2026" : "Yes, cancel"}
                       </button>
                       <button
-                        onClick={() => setShowConfirm(false)}
+                        onClick={() => { setShowConfirm(false); setCancelError(null) }}
                         className="acct-confirm-btn"
                         style={{
                           padding: "8px 16px",
