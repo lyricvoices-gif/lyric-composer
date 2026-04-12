@@ -494,6 +494,10 @@ function Composer() {
   function selectVoice(voice: VoiceDefinition) {
     setActiveVoice(voice)
     setActiveVariant(voice.defaultIntent)
+    // Clear emotion tags and inline marks — they belong to the previous voice
+    setParagraphs((prev) =>
+      prev.map((p) => ({ ...p, direction: voice.defaultIntent, marks: [] }))
+    )
     setAudioUrl(null)
     setAudioBlob(null)
     setIsPlaying(false)
