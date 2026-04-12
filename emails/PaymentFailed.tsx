@@ -33,28 +33,27 @@ export default function PaymentFailed({ firstName }: PaymentFailedProps) {
           <Hr style={divider} />
 
           <Section style={content}>
-            <Text style={eyebrow}>ACTION NEEDED</Text>
+            <Text style={eyebrow}>Action needed</Text>
             <Text style={heading}>We couldn&apos;t process your payment.</Text>
             <Text style={paragraph}>
-              Hey {name}, your most recent Lyric payment was not processed
-              successfully. Common causes include an expired card or insufficient
-              funds.
+              {name}, your most recent Lyric payment didn&apos;t go through.
+              This is usually caused by an expired card or insufficient funds.
             </Text>
             <Text style={paragraph}>
               Please update your payment method to keep your subscription active.
-              If the issue is not resolved, your access will be paused.
+              If the issue isn&apos;t resolved, your access will be paused.
             </Text>
           </Section>
 
           <Section style={{ textAlign: "center" as const, marginBottom: "32px" }}>
-            <Button href="https://composer.lyricvoices.ai" style={button}>
-              Update payment method →
+            <Button href="https://composer.lyricvoices.ai/account" style={button}>
+              Manage subscription →
             </Button>
           </Section>
 
           <Section style={content}>
             <Text style={hint}>
-              If you believe this is an error, contact us at info@lyricvoices.ai.
+              Think this is an error? Reach us at info@lyricvoices.ai.
             </Text>
           </Section>
 

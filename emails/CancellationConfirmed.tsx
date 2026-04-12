@@ -35,12 +35,12 @@ export default function CancellationConfirmed({ firstName }: CancellationConfirm
           <Section style={content}>
             <Text style={heading}>Your subscription has ended.</Text>
             <Text style={paragraph}>
-              Hey {name}, your Lyric subscription has been cancelled. No further
-              charges will be made to your account.
+              {name}, your Lyric subscription has been cancelled. No further
+              charges will be made.
             </Text>
             <Text style={paragraph}>
-              Your voice compositions and account data are saved. You can
-              resubscribe at any time from the composer.
+              Your compositions and account data are saved. If you decide to
+              come back, you can resubscribe anytime.
             </Text>
           </Section>
 
@@ -52,7 +52,7 @@ export default function CancellationConfirmed({ firstName }: CancellationConfirm
 
           <Section style={content}>
             <Text style={hint}>
-              If you have any questions, contact us at info@lyricvoices.ai.
+              Questions? Reach us at info@lyricvoices.ai.
             </Text>
           </Section>
 

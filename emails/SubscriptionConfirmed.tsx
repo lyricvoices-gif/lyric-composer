@@ -39,14 +39,14 @@ export default function SubscriptionConfirmed({
           <Hr style={divider} />
 
           <Section style={content}>
-            <Text style={eyebrow}>SUBSCRIPTION ACTIVE</Text>
+            <Text style={eyebrow}>Subscription active</Text>
             <Text style={heading}>Welcome to Lyric {planName}.</Text>
             <Text style={paragraph}>
-              Hey {name}, your {planName} plan is now active. You were charged{" "}
-              {amount} today. Your subscription renews monthly.
+              {name}, your {planName} plan is now active. You were charged{" "}
+              {amount} today and your subscription renews monthly.
             </Text>
             <Text style={paragraph}>
-              You now have full access to every voice, every direction preset, and
+              You have full access to every voice, every direction mark, and
               every generation included in your plan.
             </Text>
           </Section>
@@ -59,8 +59,11 @@ export default function SubscriptionConfirmed({
 
           <Section style={content}>
             <Text style={hint}>
-              Manage your subscription or update payment methods anytime from your
-              account settings.
+              You can manage your subscription anytime from{" "}
+              <a href="https://composer.lyricvoices.ai/account" style={{ color: "#9c958f" }}>
+                Manage subscription
+              </a>{" "}
+              in the composer.
             </Text>
           </Section>
 

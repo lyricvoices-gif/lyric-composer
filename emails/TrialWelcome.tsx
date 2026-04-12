@@ -36,12 +36,12 @@ export default function TrialWelcome({ firstName, trialEndsAt }: TrialWelcomePro
           <Section style={content}>
             <Text style={heading}>Your trial is now active.</Text>
             <Text style={paragraph}>
-              Hey {name}, welcome to Lyric. You have 7 days to explore the composer
-              and hear what voice direction can do for your copy.
+              Welcome to Lyric, {name}. You have 7 days to explore the composer
+              and hear what intentional voice direction sounds like.
             </Text>
             <Text style={paragraph}>
-              Five voices. Three tonal variants each. Direction presets that shape
-              how each line sounds in delivery, not just on the page.
+              Five voices. Three tonal variants each. Direction marks that shape
+              how every line lands in delivery, not just on the page.
             </Text>
           </Section>
 
@@ -53,9 +53,13 @@ export default function TrialWelcome({ firstName, trialEndsAt }: TrialWelcomePro
 
           <Section style={content}>
             <Text style={hint}>
-              Your trial ends on {trialEndsAt}. After that, your account will
-              automatically move to the Creator plan ($29/mo). You can cancel
-              anytime from your account settings.
+              Your trial ends on {trialEndsAt}. After that, your subscription
+              moves to the Creator plan at $29/mo. You can cancel anytime
+              from{" "}
+              <a href="https://composer.lyricvoices.ai/account" style={{ color: "#9c958f" }}>
+                Manage subscription
+              </a>{" "}
+              in the composer.
             </Text>
           </Section>
 

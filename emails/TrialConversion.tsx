@@ -40,9 +40,13 @@ export default function TrialConversion({ firstName }: TrialConversionProps) {
               Your trial converts to Creator tomorrow.
             </Text>
             <Text style={paragraph}>
-              Hey {name}, your Lyric trial converts to the Creator plan ($29/mo)
-              tomorrow. No action is needed if you would like to continue. To
-              cancel, visit your account settings before the trial ends.
+              {name}, your Lyric trial converts to the Creator plan ($29/mo)
+              tomorrow. No action needed to continue. To cancel before your
+              trial ends, visit{" "}
+              <a href="https://composer.lyricvoices.ai/account" style={{ color: "#4a4a45" }}>
+                Manage subscription
+              </a>{" "}
+              in the composer.
             </Text>
           </Section>
 
@@ -53,9 +57,9 @@ export default function TrialConversion({ firstName }: TrialConversionProps) {
               <Column>
                 {[
                   "All 5 Edition 01 voices",
-                  "50 generations per day",
+                  "25 generations per day",
                   "3 variants per voice",
-                  "Direction presets",
+                  "Inline direction marks",
                   "MP3 download",
                 ].map((f) => (
                   <Text key={f} style={featureItem}>✓ {f}</Text>
@@ -73,10 +77,10 @@ export default function TrialConversion({ firstName }: TrialConversionProps) {
           <Section style={{ textAlign: "center" as const, marginBottom: "28px" }}>
             <Text style={cancelLink}>
               Need to cancel?{" "}
-              <a href="https://composer.lyricvoices.ai" style={{ color: "#9c958f" }}>
-                Visit your account settings
-              </a>
-              {" "}before tomorrow.
+              <a href="https://composer.lyricvoices.ai/account" style={{ color: "#9c958f" }}>
+                Manage subscription
+              </a>{" "}
+              before tomorrow.
             </Text>
           </Section>
 

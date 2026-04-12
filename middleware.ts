@@ -6,7 +6,7 @@ import { isTrialActive, hasPaidPlan } from "@/lib/planConfig"
 const PUBLIC_PREFIXES = ["/sign-in", "/sign-up", "/auth/callback", "/api/"]
 
 // Paths that require auth but skip the payment/onboarding gates
-const AUTH_GATED_PREFIXES = ["/upgrade", "/onboarding"]
+const AUTH_GATED_PREFIXES = ["/upgrade", "/onboarding", "/account"]
 
 export async function middleware(request: NextRequest) {
   // Build a mutable response so the Supabase client can refresh the session cookie

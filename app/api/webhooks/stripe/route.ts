@@ -145,9 +145,10 @@ export async function POST(req: Request): Promise<Response> {
 
           await sendSubscriptionConfirmed({ to: email, firstName, planName, amount })
 
-          // Clear scheduled email IDs since the trial has converted
+          // Clear scheduled email IDs since the trial has converted,
+          // and clear any payment_failed flag from a previous failed attempt
           await supabaseAdmin.auth.admin.updateUserById(userId, {
-            app_metadata: { scheduled_email_ids: null },
+            app_metadata: { scheduled_email_ids: null, payment_failed: null },
           })
         }
       } catch (err) {
@@ -156,15 +157,21 @@ export async function POST(req: Request): Promise<Response> {
     }
   }
 
-  // ── invoice.payment_failed — notify user ──────────────────────────────────
+  // ── invoice.payment_failed — notify user + flag in app_metadata ───────────
   if (event.type === "invoice.payment_failed") {
     const invoice = event.data.object as Stripe.Invoice
     const customerId = invoice.customer as string
 
     try {
-      const { email, firstName } = await lookupUserByCustomerId(customerId)
+      const { email, firstName, userId } = await lookupUserByCustomerId(customerId)
       if (email) {
         await sendPaymentFailed({ to: email, firstName })
+      }
+      // Set payment_failed flag so the composer can show an in-app banner
+      if (userId) {
+        await supabaseAdmin.auth.admin.updateUserById(userId, {
+          app_metadata: { payment_failed: true },
+        })
       }
     } catch (err) {
       console.error("[webhook/stripe] Failed to send payment failed email:", err)

@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import { getAllVoices, VoiceDefinition } from "@/lib/voiceData"
-import { getPlanConfig, remainingGenerations, resolvePlanId, hasPaidPlan } from "@/lib/planConfig"
+import { getPlanConfig, remainingGenerations, resolvePlanId, hasPaidPlan, isTrialActive } from "@/lib/planConfig"
 import { Plus, Download, RotateCcw } from "lucide-react"
 import { trackGeneration, trackDownload, trackPreview } from "@/lib/analytics"
 import Wordmark from "@/components/Wordmark"
@@ -325,7 +325,7 @@ function ProfileDropdown() {
           zIndex: 200,
         }}>
           <a
-            href="/upgrade"
+            href="/account"
             className="lyric-dropdown-item"
             style={{
               display: "flex", alignItems: "center", gap: "10px",
@@ -336,10 +336,10 @@ function ProfileDropdown() {
             }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#756d65" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-              <circle cx="12" cy="12" r="3" />
+              <rect x="2" y="5" width="20" height="14" rx="2" />
+              <path d="M2 10h20" />
             </svg>
-            Settings
+            Manage subscription
           </a>
           <button
             onClick={handleSignOut}
@@ -395,7 +395,7 @@ function TutorialButton() {
 // ---------------------------------------------------------------------------
 
 function Composer() {
-  const { plan: planTier, isLoaded, onboardingVoice, onboardingIntent, lastVoice, lastIntent } = useCurrentUser()
+  const { plan: planTier, isLoaded, onboardingVoice, onboardingIntent, lastVoice, lastIntent, paymentFailed, trialEndsAt } = useCurrentUser()
   const searchParams = useSearchParams()
   const voices = getAllVoices()
 
@@ -902,6 +902,34 @@ function Composer() {
 
       {/* Hidden audio */}
       <audio ref={audioRef} src={audioUrl ?? undefined} preload="metadata" style={{ display: "none" }} />
+
+      {/* ── Payment failed banner (subscribers only, not trial) ─────────── */}
+      {paymentFailed && !isTrialActive(trialEndsAt) && (
+        <div style={{
+          background: "#2b2a25",
+          padding: "10px 24px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "12px",
+          fontSize: "13px",
+          color: "rgba(245,243,239,0.7)",
+        }}>
+          <span>Your last payment didn&apos;t go through. Update your payment method to keep your access.</span>
+          <a
+            href="/account"
+            style={{
+              color: "#c9a96e",
+              fontSize: "13px",
+              fontWeight: 500,
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Manage subscription →
+          </a>
+        </div>
+      )}
 
       {/* ── Top bar (52px, sticky) ───────────────────────────────────────── */}
       <header style={{

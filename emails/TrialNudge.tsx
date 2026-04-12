@@ -36,12 +36,12 @@ export default function TrialNudge({ firstName }: TrialNudgeProps) {
             <Text style={eyebrow}>2 days remaining</Text>
             <Text style={heading}>Your trial ends in 2 days.</Text>
             <Text style={paragraph}>
-              Hey {name}, your Lyric trial ends in 2 days. If you have not opened
-              the composer yet, this is a good time to try it.
+              {name}, your Lyric trial ends in 2 days. If you haven&apos;t opened
+              the composer yet, now is the time.
             </Text>
             <Text style={paragraph}>
-              Take a line of copy you have been working on and run it through Morgan
-              or Nova. Hearing how direction shapes delivery makes the difference clear.
+              Take a line of copy you&apos;ve been working on and run it through Morgan
+              or Nova. Hearing how direction shapes delivery makes the value clear.
             </Text>
           </Section>
 
@@ -53,9 +53,12 @@ export default function TrialNudge({ firstName }: TrialNudgeProps) {
 
           <Section style={content}>
             <Text style={hint}>
-              Your trial converts to Creator ($29/mo) in 2 days. No action is needed
-              if you would like to continue. You can cancel anytime from your account
-              settings.
+              Your trial converts to Creator ($29/mo) in 2 days. No action needed
+              to continue. To cancel, visit{" "}
+              <a href="https://composer.lyricvoices.ai/account" style={{ color: "#9c958f" }}>
+                Manage subscription
+              </a>{" "}
+              in the composer.
             </Text>
           </Section>
 
