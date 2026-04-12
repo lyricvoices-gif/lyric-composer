@@ -20,6 +20,7 @@ export default function AccountPage() {
   const [loaded, setLoaded] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [cancelled, setCancelled] = useState(false)
 
   useEffect(() => {
     const supabase = createClient()
@@ -47,7 +48,10 @@ export default function AccountPage() {
       const res = await fetch("/api/cancel-subscription", { method: "POST" })
       const data = await res.json()
       if (data.success) {
-        window.location.replace("/upgrade?reason=expired")
+        setCancelling(false)
+        setShowConfirm(false)
+        setCancelled(true)
+        setPlan(null)
       } else {
         console.error("[account] Cancel failed:", data.error)
         setCancelling(false)
@@ -83,7 +87,7 @@ export default function AccountPage() {
       }}>
         {/* Topbar */}
         <header style={{
-          height: "64px", padding: "0 24px",
+          height: cancelled ? "52px" : "64px", padding: "0 24px",
           display: "flex", alignItems: "center",
           justifyContent: "space-between",
           borderBottom: `1px solid ${BORDER}`,
@@ -91,22 +95,24 @@ export default function AccountPage() {
           <a href="/composer" style={{ textDecoration: "none", display: "flex", alignItems: "center" }}>
             <Wordmark height={32} color={LIGHT} />
           </a>
-          <a
-            href="/composer"
-            className="acct-back"
-            style={{
-              padding: "7px 16px",
-              borderRadius: "100px",
-              fontSize: "13px",
-              fontWeight: 500,
-              color: DARK,
-              background: LIGHT,
-              textDecoration: "none",
-              letterSpacing: "-0.01em",
-            }}
-          >
-            Back to composer
-          </a>
+          {!cancelled && (
+            <a
+              href="/composer"
+              className="acct-back"
+              style={{
+                padding: "7px 16px",
+                borderRadius: "100px",
+                fontSize: "13px",
+                fontWeight: 500,
+                color: DARK,
+                background: LIGHT,
+                textDecoration: "none",
+                letterSpacing: "-0.01em",
+              }}
+            >
+              Back to composer
+            </a>
+          )}
         </header>
 
         {/* Main */}
@@ -130,7 +136,7 @@ export default function AccountPage() {
             </h1>
 
             {!hasActivePlan ? (
-              /* No active plan */
+              /* No active plan / just cancelled */
               <div style={{
                 width: "100%",
                 background: "rgba(255,255,255,0.04)",
@@ -139,18 +145,46 @@ export default function AccountPage() {
                 padding: "32px 28px",
                 textAlign: "center",
               }}>
-                <p style={{ fontSize: "15px", color: LIGHT, margin: "0 0 16px" }}>
-                  No active subscription
-                </p>
-                <a
-                  href="/upgrade"
-                  style={{
-                    fontSize: "13px", color: GOLD,
-                    textDecoration: "none",
-                  }}
-                >
-                  Choose a plan →
-                </a>
+                {cancelled ? (
+                  <>
+                    <p style={{ fontSize: "15px", color: LIGHT, margin: "0 0 8px" }}>
+                      Your subscription has been cancelled.
+                    </p>
+                    <p style={{ fontSize: "13px", color: MUTED, margin: "0 0 20px", lineHeight: 1.5 }}>
+                      You can resubscribe anytime to regain access.
+                    </p>
+                    <a
+                      href="/upgrade"
+                      style={{
+                        display: "inline-block",
+                        padding: "9px 20px",
+                        borderRadius: "100px",
+                        fontSize: "13px",
+                        fontWeight: 500,
+                        color: DARK,
+                        background: GOLD,
+                        textDecoration: "none",
+                      }}
+                    >
+                      Choose a new plan
+                    </a>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ fontSize: "15px", color: LIGHT, margin: "0 0 16px" }}>
+                      No active subscription
+                    </p>
+                    <a
+                      href="/upgrade"
+                      style={{
+                        fontSize: "13px", color: GOLD,
+                        textDecoration: "none",
+                      }}
+                    >
+                      Choose a plan →
+                    </a>
+                  </>
+                )}
               </div>
             ) : (
               /* Active plan card */
