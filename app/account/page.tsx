@@ -38,7 +38,7 @@ export default function AccountPage() {
   const isTrial = isTrialActive(trialEndsAt)
   const daysLeft = trialDaysRemaining(trialEndsAt)
   const planConfig = getPlanConfig(plan)
-  const hasActivePlan = plan && plan !== "expired" && plan !== "none"
+  const hasActivePlan = !!plan
   const isEnterprise = plan === "enterprise"
 
   async function handleCancel() {
