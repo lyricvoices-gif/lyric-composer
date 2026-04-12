@@ -21,6 +21,7 @@ export default function AccountPage() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [cancelled, setCancelled] = useState(false)
+  const [cancelType, setCancelType] = useState<"trial" | "subscription" | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -54,6 +55,7 @@ export default function AccountPage() {
         setCancelling(false)
         setShowConfirm(false)
         setCancelled(true)
+        setCancelType(data.type ?? "subscription")
         setPlan(null)
       } else {
         console.error("[account] Cancel failed:", data.error)
@@ -132,10 +134,14 @@ export default function AccountPage() {
                 {cancelled ? (
                   <>
                     <p style={{ fontSize: "15px", color: LIGHT, margin: "0 0 8px" }}>
-                      Your subscription has been cancelled.
+                      {cancelType === "trial"
+                        ? "Your trial has been cancelled."
+                        : "Your subscription has been cancelled."}
                     </p>
                     <p style={{ fontSize: "13px", color: MUTED, margin: "0 0 20px", lineHeight: 1.5 }}>
-                      You can resubscribe anytime to regain access.
+                      {cancelType === "trial"
+                        ? "No charges will be made. You can subscribe anytime to get started."
+                        : "You can resubscribe anytime to regain access."}
                     </p>
                     <a
                       href="/upgrade"
@@ -258,7 +264,7 @@ export default function AccountPage() {
                       padding: 0,
                     }}
                   >
-                    Cancel subscription
+                    {isTrial ? "Cancel trial" : "Cancel subscription"}
                   </button>
                 ) : (
                   <div>
@@ -266,7 +272,9 @@ export default function AccountPage() {
                       fontSize: "13px", color: MUTED,
                       margin: "0 0 14px", lineHeight: 1.5,
                     }}>
-                      Are you sure? Your access will end immediately.
+                      {isTrial
+                        ? "Are you sure? Your trial will end immediately and no charges will be made."
+                        : "Are you sure? Your access will end immediately."}
                     </p>
                     {cancelError && (
                       <p style={{

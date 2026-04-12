@@ -64,6 +64,9 @@ export async function POST(): Promise<Response> {
     return Response.json({ success: true })
   }
 
+  // Determine if this is a trial or paid subscription
+  const wasTrial = subscription.status === "trialing"
+
   // Cancel immediately
   try {
     await stripe.subscriptions.cancel(subscription.id)
@@ -81,5 +84,5 @@ export async function POST(): Promise<Response> {
     )
   }
 
-  return Response.json({ success: true })
+  return Response.json({ success: true, type: wasTrial ? "trial" : "subscription" })
 }
