@@ -252,17 +252,34 @@ export default function SignInPage() {
               >
                 {loading ? "Verifying\u2026" : "Verify code"}
               </button>
-              <button
-                className="auth-link"
-                onClick={resetState}
-                style={{
-                  background: "none", border: "none",
-                  color: MUTED, fontSize: "12px",
-                  cursor: "pointer", padding: 0,
-                }}
-              >
-                Try a different method
-              </button>
+              <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
+                <button
+                  className="auth-link"
+                  onClick={handleCredentialSubmit}
+                  disabled={loading}
+                  style={{
+                    background: "none", border: "none",
+                    color: MUTED, fontSize: "12px",
+                    cursor: loading ? "default" : "pointer", padding: 0,
+                    transition: "color 0.15s",
+                  }}
+                >
+                  Resend code
+                </button>
+                <span style={{ color: "rgba(255,255,255,0.08)", fontSize: "12px" }}>|</span>
+                <button
+                  className="auth-link"
+                  onClick={resetState}
+                  style={{
+                    background: "none", border: "none",
+                    color: MUTED, fontSize: "12px",
+                    cursor: "pointer", padding: 0,
+                    transition: "color 0.15s",
+                  }}
+                >
+                  Try a different method
+                </button>
+              </div>
             </div>
           )}
 
