@@ -66,7 +66,7 @@ export default function SignInPage() {
 
   // ── OTP verification ─────────────────────────────────────────────────────
   async function handleOtpVerify() {
-    if (otp.length < 6) return
+    if (otp.length < 6 || otp.length > 8) return
     setLoading(true)
     setError(null)
     const supabase = createClient()
@@ -219,10 +219,10 @@ export default function SignInPage() {
                 className="auth-input"
                 type="text"
                 inputMode="numeric"
-                placeholder="000000"
-                maxLength={6}
+                placeholder="00000000"
+                maxLength={8}
                 value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 8))}
                 onKeyDown={(e) => e.key === "Enter" && handleOtpVerify()}
                 autoFocus
                 style={{
@@ -239,7 +239,7 @@ export default function SignInPage() {
               <button
                 className="auth-gold"
                 onClick={handleOtpVerify}
-                disabled={loading || otp.length < 6}
+                disabled={loading || otp.length < 6 || otp.length > 8}
                 style={{
                   width: "100%", padding: "12px",
                   borderRadius: "10px", border: "none",
