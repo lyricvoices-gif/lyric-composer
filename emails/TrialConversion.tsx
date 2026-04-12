@@ -30,7 +30,7 @@ export default function TrialConversion({ firstName }: TrialConversionProps) {
       <Body style={body}>
         <Container style={container}>
 
-          <Img src={ISOTOPE_SRC} width="28" height="28" alt="Lyric" style={isotopeLogo} />
+          <Img src={ISOTOPE_SRC} width="48" height="48" alt="Lyric" style={isotopeLogo} />
 
           <Hr style={divider} />
 

@@ -39,13 +39,15 @@ export async function POST(): Promise<Response> {
 
   // If no Stripe customer, nothing to cancel in Stripe — treat as success
   if (!stripeCustomerId) {
-    // Send cancellation email (non-blocking)
+    // Send cancellation email (awaited so the serverless function doesn't exit early)
     const email = user.email
     if (email) {
       const firstName = user.user_metadata?.first_name ?? user.user_metadata?.name?.split(" ")[0] ?? undefined
-      sendCancellationConfirmed({ to: email, firstName }).catch((err) =>
+      try {
+        await sendCancellationConfirmed({ to: email, firstName })
+      } catch (err) {
         console.error("[cancel] Failed to send cancellation email:", err)
-      )
+      }
     }
     return Response.json({ success: true, type: "trial" })
   }
@@ -82,13 +84,15 @@ export async function POST(): Promise<Response> {
     return Response.json({ error: "Failed to cancel subscription" }, { status: 500 })
   }
 
-  // Send cancellation email (non-blocking)
+  // Send cancellation email (awaited so the serverless function doesn't exit early)
   const email = user.email
   if (email) {
     const firstName = user.user_metadata?.first_name ?? user.user_metadata?.name?.split(" ")[0] ?? undefined
-    sendCancellationConfirmed({ to: email, firstName }).catch((err) =>
+    try {
+      await sendCancellationConfirmed({ to: email, firstName })
+    } catch (err) {
       console.error("[cancel] Failed to send cancellation email:", err)
-    )
+    }
   }
 
   return Response.json({ success: true, type: wasTrial ? "trial" : "subscription" })
