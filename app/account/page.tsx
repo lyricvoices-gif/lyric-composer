@@ -83,7 +83,7 @@ export default function AccountPage() {
       }}>
         {/* Topbar */}
         <header style={{
-          height: "52px", padding: "0 24px",
+          height: "64px", padding: "0 24px",
           display: "flex", alignItems: "center",
           justifyContent: "space-between",
           borderBottom: `1px solid ${BORDER}`,
