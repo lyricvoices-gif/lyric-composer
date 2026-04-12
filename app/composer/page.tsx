@@ -883,6 +883,7 @@ function Composer() {
         .lyric-history-scroll::-webkit-scrollbar { display: none; }
         .lyric-history-item:hover { background: rgba(234,228,222,0.5) !important; }
         .lyric-history-item:hover .lyric-history-delete { opacity: 1 !important; }
+        .lyric-history-item:hover .lyric-history-pill { opacity: 1 !important; transform: translateX(0) !important; }
         .lyric-history-delete:hover { color: #756d65 !important; background: rgba(234,228,222,0.6) !important; }
         .lyric-panel-tab:hover { background: #f5f3ef !important; }
         .lyric-vp-card { transition: background 0.15s ease; }
@@ -947,7 +948,7 @@ function Composer() {
                 <span style={{ fontSize: "11px", color: "#b5aca3" }}>Unlimited</span>
               ) : (
                 <span style={{ fontSize: "11px", fontVariantNumeric: "tabular-nums", color: remaining <= 3 ? "#c4722a" : "#b5aca3" }}>
-                  {remaining} left today
+                  {remaining} generations left today
                 </span>
               )}
               <span style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.08em", padding: "2px 8px", borderRadius: "100px", background: "#eae4de", color: "#756d65", textTransform: "uppercase" }}>
@@ -1091,24 +1092,29 @@ function Composer() {
             overflow: "hidden",
           }}
         >
-          {/* Rail icon — top-aligned with voice panel */}
-          <div style={{
-            padding: "0 0 6px 16px",
-            flexShrink: 0,
-            marginTop: "max(0px, calc(50vh - 52px - 300px))",
-          }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#b5aca3" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
-          </div>
+          {/* Top spacer — aligns dots with canvas action bar */}
+          <div style={{ height: "48px", flexShrink: 0 }} />
 
-          {/* Scrollable content */}
+          {/* Scrollable content with timeline rail */}
           <div className="lyric-history-scroll" style={{
             flex: 1,
             overflowY: historyPanelOpen ? "auto" : "hidden",
             overflowX: "hidden",
+            position: "relative",
           }}>
+            {/* Vertical timeline track — sits behind the dots */}
+            {!historyPanelOpen && (
+              <div style={{
+                position: "absolute",
+                left: "21px",
+                top: "14px",
+                bottom: "14px",
+                width: "1px",
+                background: "linear-gradient(to bottom, #e0dbd5, transparent)",
+                pointerEvents: "none",
+              }} />
+            )}
+
             {(() => {
               const now = new Date()
               const todayStr = now.toDateString()
@@ -1117,7 +1123,7 @@ function Composer() {
               const yesterdayStr = yesterday.toDateString()
 
               let lastGroup = ""
-              return compositions.slice(0, 20).map((comp) => {
+              return compositions.slice(0, 20).map((comp, idx) => {
                 const voice = voices.find((v) => v.id === comp.voice_id)
                 const preview = comp.title ?? comp.script.slice(0, 60)
                 const compDate = new Date(comp.created_at)
@@ -1129,6 +1135,9 @@ function Composer() {
 
                 const showGroup = group !== lastGroup
                 lastGroup = group
+
+                const voiceName = voice?.title ?? "Unknown"
+                const timeStr = compDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
 
                 return (
                   <div key={comp.id}>
@@ -1154,54 +1163,90 @@ function Composer() {
                         display: "flex",
                         alignItems: "center",
                         gap: "10px",
-                        padding: historyPanelOpen ? "7px 10px 7px 16px" : "9px 0 9px 18px",
+                        padding: historyPanelOpen ? "7px 10px 7px 16px" : "7px 0 7px 0",
                         justifyContent: "flex-start",
                         cursor: "pointer",
                         transition: "background 0.12s, padding 0.3s",
+                        position: "relative",
                       }}
                     >
-                      {/* Voice gradient dot — always visible */}
-                      <div style={{
-                        width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
-                        background: voice
-                          ? "linear-gradient(135deg, " + voice.gradientFrom + ", " + voice.gradientTo + ")"
-                          : "linear-gradient(135deg, #c9a96e, #9c958f)",
-                        transition: "transform 0.2s ease",
-                        transform: historyPanelOpen ? "scale(1)" : "scale(0.85)",
-                      }} />
+                      {/* Collapsed state: dot + hover pill */}
+                      {!historyPanelOpen && (
+                        <div style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0",
+                          paddingLeft: "17px",
+                        }}>
+                          {/* Voice gradient dot */}
+                          <div style={{
+                            width: "9px", height: "9px", borderRadius: "50%", flexShrink: 0,
+                            background: voice
+                              ? "linear-gradient(135deg, " + voice.gradientFrom + ", " + voice.gradientTo + ")"
+                              : "linear-gradient(135deg, #c9a96e, #9c958f)",
+                            position: "relative",
+                            zIndex: 2,
+                            boxShadow: "0 0 0 2px #f8f6f3",
+                          }} />
+                          {/* Hover pill — voice name + time */}
+                          <div
+                            className="lyric-history-pill"
+                            style={{
+                              marginLeft: "8px",
+                              padding: "3px 10px",
+                              borderRadius: "100px",
+                              background: "rgba(43,42,37,0.88)",
+                              color: "#f5f3ef",
+                              fontSize: "11px",
+                              fontWeight: 500,
+                              whiteSpace: "nowrap",
+                              opacity: 0,
+                              transform: "translateX(-4px)",
+                              transition: "opacity 0.15s ease, transform 0.15s ease",
+                              pointerEvents: "none",
+                            }}
+                          >
+                            {voiceName} <span style={{ color: "rgba(245,243,239,0.45)", fontWeight: 400 }}>·</span> <span style={{ color: "rgba(245,243,239,0.5)", fontWeight: 400 }}>{timeStr}</span>
+                          </div>
+                        </div>
+                      )}
 
-                      {/* Text preview — visible when expanded */}
-                      <p style={{
-                        fontSize: "13px", color: "#2a2622", margin: 0, lineHeight: 1.35,
-                        overflow: "hidden", textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        flex: 1,
-                        minWidth: 0,
-                        opacity: historyPanelOpen ? 1 : 0,
-                        transition: "opacity 0.15s ease 0.05s",
-                      }}>
-                        {preview}
-                      </p>
-
-                      {/* Delete icon — appears on item hover when expanded */}
+                      {/* Expanded state: dot + text preview + delete */}
                       {historyPanelOpen && (
-                        <button
-                          className="lyric-history-delete"
-                          onClick={(e) => { e.stopPropagation(); deleteComposition(comp.id) }}
-                          style={{
-                            flexShrink: 0,
-                            width: "22px", height: "22px",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            background: "none", border: "none",
-                            color: "#d4cfc9", cursor: "pointer",
-                            fontSize: "13px", lineHeight: 1,
-                            borderRadius: "5px",
-                            transition: "color 0.12s, background 0.12s, opacity 0.12s",
-                            opacity: 0,
-                          }}
-                        >
-                          ×
-                        </button>
+                        <>
+                          <div style={{
+                            width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
+                            background: voice
+                              ? "linear-gradient(135deg, " + voice.gradientFrom + ", " + voice.gradientTo + ")"
+                              : "linear-gradient(135deg, #c9a96e, #9c958f)",
+                          }} />
+                          <p style={{
+                            fontSize: "13px", color: "#2a2622", margin: 0, lineHeight: 1.35,
+                            overflow: "hidden", textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            flex: 1,
+                            minWidth: 0,
+                          }}>
+                            {preview}
+                          </p>
+                          <button
+                            className="lyric-history-delete"
+                            onClick={(e) => { e.stopPropagation(); deleteComposition(comp.id) }}
+                            style={{
+                              flexShrink: 0,
+                              width: "22px", height: "22px",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              background: "none", border: "none",
+                              color: "#d4cfc9", cursor: "pointer",
+                              fontSize: "13px", lineHeight: 1,
+                              borderRadius: "5px",
+                              transition: "color 0.12s, background 0.12s, opacity 0.12s",
+                              opacity: 0,
+                            }}
+                          >
+                            ×
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
