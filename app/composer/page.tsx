@@ -320,7 +320,7 @@ function ProfileDropdown() {
           position: "absolute",
           top: "calc(100% + 8px)",
           right: 0,
-          width: "180px",
+          width: "210px",
           background: "#ffffff",
           border: "1px solid #eae4de",
           borderRadius: "12px",

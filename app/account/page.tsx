@@ -67,8 +67,8 @@ export default function AccountPage() {
   return (
     <>
       <style>{`
-        .acct-back { transition: color 0.15s; }
-        .acct-back:hover { color: ${LIGHT} !important; }
+        .acct-back { transition: opacity 0.15s; }
+        .acct-back:hover { opacity: 0.85 !important; }
         .acct-cancel-link { transition: color 0.15s; }
         .acct-cancel-link:hover { color: rgba(245,243,239,0.65) !important; }
         .acct-confirm-btn { transition: all 0.15s; }
@@ -95,11 +95,17 @@ export default function AccountPage() {
             href="/composer"
             className="acct-back"
             style={{
-              fontSize: "13px", color: MUTED,
+              padding: "7px 16px",
+              borderRadius: "100px",
+              fontSize: "13px",
+              fontWeight: 500,
+              color: DARK,
+              background: LIGHT,
               textDecoration: "none",
+              letterSpacing: "-0.01em",
             }}
           >
-            ← Back to composer
+            Back to composer
           </a>
         </header>
 
