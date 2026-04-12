@@ -175,7 +175,7 @@ export default function OnboardingFlow({ isRevisit = false }: { isRevisit?: bool
           intent: selectedVariant,
         }),
       })
-      router.push(`/composer?voice=${encodeURIComponent(selectedVoice.id)}&variant=${encodeURIComponent(selectedVariant)}`)
+      router.push(`/?voice=${encodeURIComponent(selectedVoice.id)}&variant=${encodeURIComponent(selectedVariant)}`)
     } catch {
       setIsSubmitting(false)
     }

@@ -89,7 +89,7 @@ export default function SignInPage() {
       // Non-fatal
     }
 
-    router.push("/composer")
+    router.push("/")
   }
 
   // ── Render ────────────────────────────────────────────────────────────────

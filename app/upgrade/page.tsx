@@ -60,7 +60,7 @@ function UpgradeContent() {
       const hasPlan = meta.plan_tier && meta.plan_tier !== "none" && meta.plan_tier !== "expired"
       const hasTrial = meta.trial_ends_at && new Date(meta.trial_ends_at) > new Date()
       if (hasPlan || hasTrial) {
-        const dest = meta.onboarding_complete ? "/composer" : "/onboarding"
+        const dest = meta.onboarding_complete ? "/" : "/onboarding"
         router.replace(dest)
       }
     })

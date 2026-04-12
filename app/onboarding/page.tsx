@@ -26,7 +26,7 @@ export default async function OnboardingPage({ searchParams }: Props) {
   const isRevisit = params.revisit === "1"
 
   // If onboarding is done and this isn't a revisit, go straight to the composer
-  if (meta.onboarding_complete && !isRevisit) redirect("/composer")
+  if (meta.onboarding_complete && !isRevisit) redirect("/")
 
   return <OnboardingFlow isRevisit={isRevisit} />
 }

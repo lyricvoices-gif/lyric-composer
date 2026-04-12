@@ -64,6 +64,6 @@ export async function GET(request: Request): Promise<Response> {
     return NextResponse.redirect(`${origin}/upgrade`)
   }
 
-  const destination = meta.onboarding_complete ? "/composer" : "/onboarding"
+  const destination = meta.onboarding_complete ? "/" : "/onboarding"
   return NextResponse.redirect(`${origin}${destination}`)
 }

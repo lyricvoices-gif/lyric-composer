@@ -88,7 +88,7 @@ export default function SignUpPage() {
       // Non-fatal
     }
 
-    router.push("/composer")
+    router.push("/")
   }
 
   // ── Render ────────────────────────────────────────────────────────────────

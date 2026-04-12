@@ -71,8 +71,8 @@ export default function AccountPage() {
   return (
     <>
       <style>{`
-        .acct-back { transition: color 0.15s; }
-        .acct-back:hover { color: ${LIGHT} !important; }
+        .acct-back { transition: opacity 0.15s; }
+        .acct-back:hover { opacity: 0.85 !important; }
         .acct-cancel-link { transition: color 0.15s; }
         .acct-cancel-link:hover { color: rgba(245,243,239,0.65) !important; }
         .acct-confirm-btn { transition: all 0.15s; }
@@ -91,7 +91,7 @@ export default function AccountPage() {
           display: "flex", alignItems: "center",
           borderBottom: `1px solid ${BORDER}`,
         }}>
-          <a href="/composer" style={{ textDecoration: "none", display: "flex", alignItems: "center" }}>
+          <a href="/" style={{ textDecoration: "none", display: "flex", alignItems: "center" }}>
             <Wordmark height={32} color={LIGHT} />
           </a>
         </header>
@@ -304,15 +304,20 @@ export default function AccountPage() {
               </div>
             )}
 
-            {/* Back link — hidden after cancellation */}
+            {/* Back button — hidden after cancellation */}
             {!cancelled && (
               <a
-                href="/composer"
+                href="/"
                 className="acct-back"
                 style={{
-                  fontSize: "12px",
-                  color: MUTED,
+                  padding: "10px 24px",
+                  borderRadius: "100px",
+                  fontSize: "13px",
+                  fontWeight: 500,
+                  color: DARK,
+                  background: LIGHT,
                   textDecoration: "none",
+                  letterSpacing: "-0.01em",
                 }}
               >
                 Back to composer
