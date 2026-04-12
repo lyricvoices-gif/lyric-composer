@@ -37,8 +37,10 @@ export async function POST(): Promise<Response> {
     return Response.json({ error: "Database error" }, { status: 500 })
   }
 
+  // If no Stripe customer or no active subscription, still treat as success
+  // (nothing to cancel = already cancelled)
   if (!stripeCustomerId) {
-    return Response.json({ error: "No billing account found" }, { status: 400 })
+    return Response.json({ success: true })
   }
 
   // Find active or trialing subscription
@@ -59,7 +61,7 @@ export async function POST(): Promise<Response> {
   }
 
   if (!subscription) {
-    return Response.json({ error: "No active subscription found" }, { status: 404 })
+    return Response.json({ success: true })
   }
 
   // Cancel immediately
