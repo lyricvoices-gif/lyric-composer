@@ -10,6 +10,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { neon } from "@neondatabase/serverless"
 import Stripe from "stripe"
+import { sendCancellationConfirmed } from "@/lib/email"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
@@ -67,6 +68,15 @@ export async function POST(): Promise<Response> {
   } catch (err) {
     console.error("[cancel] Failed to cancel subscription:", err)
     return Response.json({ error: "Failed to cancel subscription" }, { status: 500 })
+  }
+
+  // Send cancellation email (non-blocking)
+  const email = user.email
+  if (email) {
+    const firstName = user.user_metadata?.first_name ?? user.user_metadata?.name?.split(" ")[0] ?? undefined
+    sendCancellationConfirmed({ to: email, firstName }).catch((err) =>
+      console.error("[cancel] Failed to send cancellation email:", err)
+    )
   }
 
   return Response.json({ success: true })
