@@ -2,7 +2,7 @@
 
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 import { createClient } from "@/lib/supabase/client"
-import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react"
+import { Suspense, useState, useRef, useEffect, useLayoutEffect, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import { getAllVoices, VoiceDefinition } from "@/lib/voiceData"
 import { getPlanConfig, remainingGenerations, resolvePlanId, hasPaidPlan, isTrialActive } from "@/lib/planConfig"
@@ -261,7 +261,11 @@ function assembleSegments(paragraphs: Paragraph[], defaultIntent: string): Array
 // ---------------------------------------------------------------------------
 
 export default function ComposerPage() {
-  return <Composer />
+  return (
+    <Suspense fallback={<div style={{ minHeight: "100vh", background: "#2b2a25" }} />}>
+      <Composer />
+    </Suspense>
+  )
 }
 
 function NoPlanWall() {
