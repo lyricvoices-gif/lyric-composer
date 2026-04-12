@@ -33,14 +33,21 @@ export async function POST(): Promise<Response> {
     `
     stripeCustomerId = (rows[0] as { stripe_customer_id: string | null })?.stripe_customer_id ?? null
   } catch (err) {
+    // DB query failed (column may not exist, or no row) — not fatal for cancellation
     console.error("[cancel] Failed to query user_profiles:", err)
-    return Response.json({ error: "Database error" }, { status: 500 })
   }
 
-  // If no Stripe customer or no active subscription, still treat as success
-  // (nothing to cancel = already cancelled)
+  // If no Stripe customer, nothing to cancel in Stripe — treat as success
   if (!stripeCustomerId) {
-    return Response.json({ success: true })
+    // Send cancellation email (non-blocking)
+    const email = user.email
+    if (email) {
+      const firstName = user.user_metadata?.first_name ?? user.user_metadata?.name?.split(" ")[0] ?? undefined
+      sendCancellationConfirmed({ to: email, firstName }).catch((err) =>
+        console.error("[cancel] Failed to send cancellation email:", err)
+      )
+    }
+    return Response.json({ success: true, type: "trial" })
   }
 
   // Find active or trialing subscription
