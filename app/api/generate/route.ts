@@ -52,6 +52,8 @@ interface Segment {
   text: string
   intent?: string
   emotion?: string
+  voiceId?: string
+  variant?: string
 }
 
 interface GenerateRequest {
@@ -60,6 +62,7 @@ interface GenerateRequest {
   script: string
   direction: Direction
   segments: Segment[]
+  multiVoice?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -212,7 +215,7 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 })
   }
 
-  const { voiceId, variant, script, direction, segments } = body
+  const { voiceId, variant, script, direction, segments, multiVoice } = body
 
   if (!voiceId || !variant || !script) {
     return Response.json(
@@ -284,19 +287,33 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   // ── 5. Forward to Cloudflare worker ───────────────────────────────────────
-  // The worker uses seg.intent as the Hume `description` acting instruction
-  // when the intent doesn’t match a known variant.  Replace bare emotion
-  // tokens ("calm") with richer descriptions ("calm, steady, preserving
-  // natural voice quality") so Octave layers emotion while keeping the
-  // original voice’s identity intact.
-  const enrichedSegments = enrichSegments(segments ?? [], voice.intents)
+  // Multi-voice: each segment may carry its own voiceId + variant.
+  // Enrich segments per their own voice’s intents, and pass per-segment
+  // voice info so the worker can resolve the correct Hume model per segment.
+  let enrichedSegments: Segment[]
+  if (multiVoice && segments?.some((s) => s.voiceId)) {
+    // Enrich each segment based on its own voice’s intents
+    enrichedSegments = (segments ?? []).map((seg) => {
+      const segVoiceId = seg.voiceId ?? voiceId
+      let segVoice
+      try { segVoice = getVoice(segVoiceId as VoiceId) } catch { segVoice = voice }
+      const token = seg.intent ?? seg.emotion
+      if (!token) return seg
+      if (segVoice.intents.includes(token)) return seg
+      const key = token.toLowerCase()
+      const desc = EMOTION_DESCRIPTIONS[key] ?? `${token.toLowerCase()}, natural delivery. Begin speaking immediately, no filler.`
+      return { ...seg, intent: desc }
+    })
+  } else {
+    enrichedSegments = enrichSegments(segments ?? [], voice.intents)
+  }
 
   let workerRes: Response
   try {
     workerRes = await fetch(WORKER_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ voiceId, variant, script, direction, segments: enrichedSegments }),
+      body: JSON.stringify({ voiceId, variant, script, direction, segments: enrichedSegments, multiVoice: !!multiVoice }),
     })
   } catch (err) {
     console.error("[generate] Worker fetch failed:", err)

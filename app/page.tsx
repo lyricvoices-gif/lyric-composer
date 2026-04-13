@@ -162,6 +162,8 @@ interface Paragraph {
   text: string
   direction: string
   marks: InlineMark[]
+  voiceId: string
+  variant: string
 }
 
 interface Composition {
@@ -229,12 +231,22 @@ function getDirectionOptions(voice: VoiceDefinition): string[] {
   return emotionGroup.items.map((item) => item.label)
 }
 
-function assembleSegments(paragraphs: Paragraph[], defaultIntent: string): Array<{ text: string; intent: string }> {
-  const segments: Array<{ text: string; intent: string }> = []
+interface AssembledSegment {
+  text: string
+  intent: string
+  voiceId: string
+  variant: string
+}
+
+function assembleSegments(paragraphs: Paragraph[], defaultIntent: string): AssembledSegment[] {
+  const segments: AssembledSegment[] = []
   for (const para of paragraphs) {
     if (!para.text.trim()) continue
+    const voiceId = para.voiceId
+    const variant = para.variant
+    const paraDefault = variant || defaultIntent
     if (!para.marks.length) {
-      segments.push({ text: para.text, intent: defaultIntent })
+      segments.push({ text: para.text, intent: paraDefault, voiceId, variant })
       continue
     }
     const sorted = [...para.marks].sort((a, b) => a.start - b.start)
@@ -242,15 +254,15 @@ function assembleSegments(paragraphs: Paragraph[], defaultIntent: string): Array
     for (const mark of sorted) {
       if (mark.start > cursor) {
         const chunk = para.text.slice(cursor, mark.start)
-        if (chunk.trim()) segments.push({ text: chunk, intent: defaultIntent })
+        if (chunk.trim()) segments.push({ text: chunk, intent: paraDefault, voiceId, variant })
       }
       const marked = para.text.slice(mark.start, mark.end)
-      if (marked.trim()) segments.push({ text: marked, intent: mark.direction })
+      if (marked.trim()) segments.push({ text: marked, intent: mark.direction, voiceId, variant })
       cursor = mark.end
     }
     if (cursor < para.text.length) {
       const tail = para.text.slice(cursor)
-      if (tail.trim()) segments.push({ text: tail, intent: defaultIntent })
+      if (tail.trim()) segments.push({ text: tail, intent: paraDefault, voiceId, variant })
     }
   }
   return segments
@@ -418,8 +430,13 @@ function Composer() {
     if (voiceId) {
       const match = voices.find((v) => v.id === voiceId)
       if (match) {
+        const resolvedIntent = intent ?? match.defaultIntent
         setActiveVoice(match)
-        setActiveVariant(intent ?? match.defaultIntent)
+        setActiveVariant(resolvedIntent)
+        // Apply onboarding voice to all existing paragraphs
+        setParagraphs((prev) =>
+          prev.map((p) => ({ ...p, voiceId: match.id, variant: resolvedIntent }))
+        )
       }
     }
     setHasRestoredOnboardingVoice(true)
@@ -429,10 +446,20 @@ function Composer() {
     }
   }, [isLoaded, lastVoice, lastIntent, onboardingVoice, onboardingIntent, voices, hasRestoredOnboardingVoice, searchParams])
 
-  // Paragraphs with inline marks
+  // Paragraphs with inline marks + per-paragraph voice
   const [paragraphs, setParagraphs] = useState<Paragraph[]>([
-    { id: crypto.randomUUID(), text: "", direction: "Conversational", marks: [] },
+    { id: crypto.randomUUID(), text: "", direction: "Conversational", marks: [], voiceId: voices[0].id, variant: voices[0].defaultIntent },
   ])
+
+  // Track focused paragraph for voice panel assignment
+  const [focusedParagraphId, setFocusedParagraphId] = useState<string | null>(null)
+
+  // Voice-switch confirmation dialog
+  const [voiceSwitchConfirm, setVoiceSwitchConfirm] = useState<{
+    paraId: string
+    newVoice: VoiceDefinition
+    newVariant: string
+  } | null>(null)
 
   // Selection toolbar
   const [selectionInfo, setSelectionInfo] = useState<{
@@ -489,25 +516,73 @@ function Composer() {
   const assembledScript = paragraphs.map((p) => p.text).join("\n\n").trim()
   const isOverScriptLimit = assembledScript.length > plan.maxScriptCharacters
   const canGenerate = !isGenerating && !isAtLimit && !isOverScriptLimit && assembledScript.length > 0
-  const directionOptions = getDirectionOptions(activeVoice)
+  // Direction options are per-paragraph (based on that paragraph's voice)
+  const focusedPara = paragraphs.find((p) => p.id === focusedParagraphId)
+  const focusedVoice = focusedPara ? voices.find((v) => v.id === focusedPara.voiceId) ?? activeVoice : activeVoice
+  const directionOptions = getDirectionOptions(focusedVoice)
 
   // ---------------------------------------------------------------------------
   // Voice handlers
   // ---------------------------------------------------------------------------
 
-  function selectVoice(voice: VoiceDefinition) {
-    setActiveVoice(voice)
-    setActiveVariant(voice.defaultIntent)
-    // Clear emotion tags and inline marks — they belong to the previous voice
+  /** Assign a voice to a specific paragraph (with mark-clearing confirmation if needed) */
+  function assignVoiceToParagraph(paraId: string, voice: VoiceDefinition, variant?: string) {
+    const resolvedVariant = variant ?? voice.defaultIntent
+    const para = paragraphs.find((p) => p.id === paraId)
+    if (!para) return
+
+    // If paragraph has marks and we're switching to a different voice, confirm first
+    if (para.marks.length > 0 && para.voiceId !== voice.id) {
+      setVoiceSwitchConfirm({ paraId, newVoice: voice, newVariant: resolvedVariant })
+      return
+    }
+
+    applyVoiceToParagraph(paraId, voice, resolvedVariant)
+  }
+
+  /** Actually apply the voice switch (called directly or after confirmation) */
+  function applyVoiceToParagraph(paraId: string, voice: VoiceDefinition, variant: string) {
     setParagraphs((prev) =>
-      prev.map((p) => ({ ...p, direction: voice.defaultIntent, marks: [] }))
+      prev.map((p) =>
+        p.id === paraId
+          ? { ...p, voiceId: voice.id, variant, direction: variant, marks: p.voiceId !== voice.id ? [] : p.marks }
+          : p
+      )
     )
+    // Update the "last active" voice to reflect the focused paragraph
+    setActiveVoice(voice)
+    setActiveVariant(variant)
     setAudioUrl(null)
     setAudioBlob(null)
     setIsPlaying(false)
     setCurrentTime(0)
     setDuration(0)
     setGenerationError(null)
+  }
+
+  /** Confirm voice switch — clears marks and applies */
+  function confirmVoiceSwitch() {
+    if (!voiceSwitchConfirm) return
+    const { paraId, newVoice, newVariant } = voiceSwitchConfirm
+    applyVoiceToParagraph(paraId, newVoice, newVariant)
+    setVoiceSwitchConfirm(null)
+  }
+
+  /** Right panel click — assigns voice to focused paragraph (or first paragraph) */
+  function selectVoice(voice: VoiceDefinition) {
+    const targetId = focusedParagraphId ?? paragraphs[0]?.id
+    if (!targetId) return
+    assignVoiceToParagraph(targetId, voice)
+  }
+
+  /** Change expression on a specific paragraph (no mark clearing needed) */
+  function changeParagraphVariant(paraId: string, variant: string) {
+    setParagraphs((prev) =>
+      prev.map((p) =>
+        p.id === paraId ? { ...p, variant, direction: variant } : p
+      )
+    )
+    setActiveVariant(variant)
   }
 
   function toggleSamplePlay(voice: VoiceDefinition) {
@@ -530,10 +605,20 @@ function Composer() {
   // ---------------------------------------------------------------------------
 
   function addParagraph() {
-    setParagraphs((prev) => [
-      ...prev,
-      { id: crypto.randomUUID(), text: "", direction: activeVariant, marks: [] },
-    ])
+    setParagraphs((prev) => {
+      const last = prev[prev.length - 1]
+      return [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          text: "",
+          direction: last?.variant ?? activeVariant,
+          marks: [],
+          voiceId: last?.voiceId ?? activeVoice.id,
+          variant: last?.variant ?? activeVariant,
+        },
+      ]
+    })
   }
 
   function updateParagraphText(id: string, text: string) {
@@ -637,6 +722,11 @@ function Composer() {
     const startedAt = Date.now()
 
     try {
+      const segments = assembleSegments(paragraphs, activeVariant)
+      // Determine if this is a multi-voice generation
+      const uniqueVoices = new Set(segments.map((s) => `${s.voiceId}:${s.variant}`))
+      const isMultiVoice = uniqueVoices.size > 1
+
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -645,7 +735,8 @@ function Composer() {
           variant: activeVariant,
           script: assembledScript,
           direction: { mode: "inline", intent: activeVariant },
-          segments: assembleSegments(paragraphs, activeVariant),
+          segments: segments.map((s) => ({ text: s.text, intent: s.intent, voiceId: s.voiceId, variant: s.variant })),
+          multiVoice: isMultiVoice,
         }),
       })
 
@@ -769,9 +860,14 @@ function Composer() {
     const voice = voices.find((v) => v.id === comp.voice_id)
     if (voice) { setActiveVoice(voice); setActiveVariant(comp.variant) }
     if (comp.directions && comp.directions.length > 0) {
-      setParagraphs(comp.directions.map((p) => ({ ...(p as Paragraph), marks: (p as any).marks ?? [] })))
+      setParagraphs(comp.directions.map((p) => ({
+        ...(p as Paragraph),
+        marks: (p as any).marks ?? [],
+        voiceId: (p as any).voiceId ?? comp.voice_id ?? activeVoice.id,
+        variant: (p as any).variant ?? comp.variant ?? activeVariant,
+      })))
     } else {
-      setParagraphs([{ id: crypto.randomUUID(), text: comp.script, direction: "Conversational", marks: [] }])
+      setParagraphs([{ id: crypto.randomUUID(), text: comp.script, direction: "Conversational", marks: [], voiceId: comp.voice_id ?? activeVoice.id, variant: comp.variant ?? activeVariant }])
     }
     setAudioUrl(null); setAudioBlob(null); setIsPlaying(false)
     setCurrentTime(0); setDuration(0); setGenerationError(null)
@@ -780,7 +876,7 @@ function Composer() {
 
   function handleNewComposition() {
     if (assembledScript.trim() && !confirm("Start a new composition? Your current script will be cleared.")) return
-    setParagraphs([{ id: crypto.randomUUID(), text: "", direction: activeVariant, marks: [] }])
+    setParagraphs([{ id: crypto.randomUUID(), text: "", direction: activeVariant, marks: [], voiceId: activeVoice.id, variant: activeVariant }])
     setAudioUrl(null); setAudioBlob(null); setIsPlaying(false)
     setCurrentTime(0); setDuration(0); setGenerationError(null)
     setCurrentCompositionId(null)
@@ -897,9 +993,11 @@ function Composer() {
         .lyric-vp-card { transition: background 0.15s ease; }
         .lyric-vp-card:hover { background: rgba(234,228,222,0.5) !important; }
         .lyric-vp-expr { transition: background 0.12s ease; }
-        .lyric-vp-expr:hover { background: #eae4de !important; }
         .lyric-vp-sample { transition: background 0.12s ease; }
         .lyric-vp-sample:hover { background: #eae4de !important; }
+        .lyric-voice-chip:hover { border-color: #B8955A !important; background: rgba(184,149,90,0.06) !important; }
+        .lyric-chip-voice-opt:hover { background: rgba(234,228,222,0.5) !important; }
+        .lyric-chip-expr-opt:hover { background: #eae4de !important; }
         .lyric-scrubber { -webkit-appearance: none; appearance: none; height: 3px; border-radius: 2px; background: rgba(248,246,243,0.2); outline: none; cursor: pointer; }
         .lyric-scrubber::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #faf9f7; cursor: pointer; }
         .lyric-scrubber::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #faf9f7; border: none; cursor: pointer; }
@@ -1020,6 +1118,9 @@ function Composer() {
               <ParagraphBlock
                 key={para.id}
                 para={para}
+                voice={voices.find((v) => v.id === para.voiceId)}
+                allVoices={voices}
+                isFocused={focusedParagraphId === para.id}
                 onTextChange={(text) => updateParagraphText(para.id, text)}
                 onRemove={() => removeParagraph(para.id)}
                 canRemove={paragraphs.length > 1}
@@ -1027,6 +1128,9 @@ function Composer() {
                   setSelectionInfo(info ? { paraId: para.id, ...info } : null)
                 }
                 onMarkRemove={(markId) => removeMark(para.id, markId)}
+                onFocus={() => setFocusedParagraphId(para.id)}
+                onVoiceChange={(voice, variant) => assignVoiceToParagraph(para.id, voice, variant)}
+                onVariantChange={(variant) => changeParagraphVariant(para.id, variant)}
               />
             ))}
           </div>
@@ -1300,7 +1404,7 @@ function Composer() {
         >
           <div style={{
             width: "10px", height: "10px", borderRadius: "50%",
-            background: `linear-gradient(135deg, ${activeVoice.gradientFrom}, ${activeVoice.gradientTo})`,
+            background: `linear-gradient(135deg, ${focusedVoice.gradientFrom}, ${focusedVoice.gradientTo})`,
           }} />
           <svg
             width="12" height="12" viewBox="0 0 24 24" fill="none"
@@ -1350,7 +1454,8 @@ function Composer() {
           padding: "8px 0",
         }}>
           {voices.map((voice) => {
-            const isActive = activeVoice.id === voice.id
+            const focusedParaVoiceId = focusedPara?.voiceId ?? activeVoice.id
+            const isActive = focusedParaVoiceId === voice.id
             return (
               <div key={voice.id}>
                 {/* Voice card header (always visible) */}
@@ -1393,9 +1498,9 @@ function Composer() {
                   </div>
                 </button>
 
-                {/* Expanded details (active voice only) */}
+                {/* Expanded details (active voice only) — browse-only: blurb + sample */}
                 <div style={{
-                  maxHeight: isActive ? "300px" : "0",
+                  maxHeight: isActive ? "200px" : "0",
                   opacity: isActive ? 1 : 0,
                   overflow: "hidden",
                   transition: "max-height 0.25s ease, opacity 0.2s ease",
@@ -1404,41 +1509,6 @@ function Composer() {
                     <p style={{ fontSize: "11px", color: "#9c958f", margin: "0 0 12px", lineHeight: 1.5 }}>
                       {voice.blurb}
                     </p>
-
-                    {/* Expression label */}
-                    <p style={{
-                      fontSize: "9px", fontWeight: 700, letterSpacing: "0.12em",
-                      color: "#b5aca3", textTransform: "uppercase", margin: "0 0 6px",
-                    }}>
-                      Select Expression
-                    </p>
-
-                    {/* Variant pills */}
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "14px" }}>
-                      {voice.intents.map((intent) => {
-                        const isActiveIntent = activeVariant === intent
-                        return (
-                          <button
-                            key={intent}
-                            className="lyric-vp-expr"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setActiveVariant(intent)
-                            }}
-                            style={{
-                              padding: "3px 10px", borderRadius: "100px",
-                              border: isActiveIntent ? "none" : "1px solid #d4cfc9",
-                              background: isActiveIntent ? "#2a2622" : "transparent",
-                              color: isActiveIntent ? "#faf9f7" : "#756d65",
-                              fontSize: "11px", fontWeight: isActiveIntent ? 500 : 400,
-                              cursor: "pointer", transition: "all 0.12s",
-                            }}
-                          >
-                            {intent}
-                          </button>
-                        )
-                      })}
-                    </div>
 
                     {/* Play sample */}
                     <button
@@ -1491,6 +1561,67 @@ function Composer() {
           onApply={(dir) => addMark(selectionInfo.paraId, selectionInfo.offsets, dir)}
         />
       )}
+
+      {/* ── Voice-switch confirmation dialog ──────────────────────────── */}
+      {voiceSwitchConfirm && (() => {
+        const targetPara = paragraphs.find((p) => p.id === voiceSwitchConfirm.paraId)
+        const currentVoice = voices.find((v) => v.id === targetPara?.voiceId)
+        const newVoice = voiceSwitchConfirm.newVoice
+        return (
+          <div style={{
+            position: "fixed", inset: 0, zIndex: 500,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            background: "rgba(43,42,37,0.4)",
+            backdropFilter: "blur(4px)",
+          }}>
+            <div style={{
+              background: "#ffffff",
+              borderRadius: "16px",
+              border: "1px solid #eae4de",
+              boxShadow: "0 16px 48px rgba(42,38,34,0.16)",
+              padding: "28px 32px",
+              maxWidth: "380px",
+              width: "90%",
+            }}>
+              <p style={{
+                fontSize: "15px", fontWeight: 600, color: "#2a2622",
+                margin: "0 0 10px", lineHeight: 1.3,
+              }}>
+                Switch voice?
+              </p>
+              <p style={{
+                fontSize: "13px", color: "#756d65", margin: "0 0 20px", lineHeight: 1.5,
+              }}>
+                Switching from {currentVoice?.title.split("\u00b7")[0].trim() ?? "this voice"} to {newVoice.title.split("\u00b7")[0].trim()} will clear the direction marks on this paragraph. Emotions are voice-specific.
+              </p>
+              <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                <button
+                  onClick={() => setVoiceSwitchConfirm(null)}
+                  style={{
+                    padding: "8px 18px", borderRadius: "100px",
+                    border: "1px solid #d4cfc9", background: "transparent",
+                    fontSize: "13px", fontWeight: 500, color: "#756d65",
+                    cursor: "pointer", transition: "background 0.12s",
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmVoiceSwitch}
+                  style={{
+                    padding: "8px 18px", borderRadius: "100px",
+                    border: "none", background: "#2a2622",
+                    fontSize: "13px", fontWeight: 500, color: "#faf9f7",
+                    cursor: "pointer", transition: "background 0.12s",
+                  }}
+                >
+                  Switch voice
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
 
       {/* Change 5: Floating pill player bar */}
@@ -1654,17 +1785,31 @@ function SelectionToolbar({
 
 function ParagraphBlock({
   para,
+  voice,
+  allVoices,
+  isFocused,
   onTextChange, onRemove, canRemove,
   onSelectionChange, onMarkRemove,
+  onFocus,
+  onVoiceChange,
+  onVariantChange,
 }: {
   para: Paragraph
+  voice: VoiceDefinition | undefined
+  allVoices: VoiceDefinition[]
+  isFocused: boolean
   onTextChange: (text: string) => void
   onRemove: () => void
   canRemove: boolean
   onSelectionChange: (info: { rectLeft: number; rectTop: number; rectWidth: number; offsets: { start: number; end: number } } | null) => void
   onMarkRemove: (markId: string) => void
+  onFocus: () => void
+  onVoiceChange: (voice: VoiceDefinition, variant?: string) => void
+  onVariantChange: (variant: string) => void
 }) {
   const editorRef = useRef<HTMLDivElement>(null)
+  const [chipDropdownOpen, setChipDropdownOpen] = useState(false)
+  const chipRef = useRef<HTMLDivElement>(null)
 
   useLayoutEffect(() => {
     if (editorRef.current) {
@@ -1685,6 +1830,18 @@ function ParagraphBlock({
     }
   }, [marksKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!chipDropdownOpen) return
+    function handleClick(e: MouseEvent) {
+      if (chipRef.current && !chipRef.current.contains(e.target as Node)) {
+        setChipDropdownOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClick)
+    return () => document.removeEventListener("mousedown", handleClick)
+  }, [chipDropdownOpen])
+
   function handleInput() {
     if (!editorRef.current) return
     const raw = editorRef.current.innerText.replace(/\n$/, "")
@@ -1701,8 +1858,167 @@ function ParagraphBlock({
     onSelectionChange({ rectLeft: rect.left, rectTop: rect.top, rectWidth: rect.width, offsets })
   }
 
+  const displayVoice = voice ?? allVoices[0]
+  const voiceName = displayVoice.title.split("\u00b7")[0].trim()
+
   return (
     <div style={{ position: "relative" }}>
+      {/* ── Voice chip ─────────────────────────────────────────────── */}
+      <div ref={chipRef} style={{ position: "relative", marginBottom: "10px" }}>
+        <button
+          className="lyric-voice-chip"
+          onClick={() => setChipDropdownOpen(!chipDropdownOpen)}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            padding: "4px 10px 4px 8px",
+            borderRadius: "100px",
+            border: isFocused ? "1px solid #B8955A" : "1px solid #e0dbd5",
+            background: isFocused ? "rgba(184,149,90,0.06)" : "transparent",
+            cursor: "pointer",
+            transition: "all 0.15s ease",
+          }}
+        >
+          {/* Voice gradient dot */}
+          <div style={{
+            width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
+            background: `linear-gradient(135deg, ${displayVoice.gradientFrom}, ${displayVoice.gradientTo})`,
+          }} />
+          <span style={{
+            fontSize: "11px", fontWeight: 500, color: "#2a2622",
+            letterSpacing: "-0.01em",
+          }}>
+            {voiceName}
+          </span>
+          <span style={{ fontSize: "11px", color: "#9c958f", fontWeight: 400 }}>
+            ·
+          </span>
+          <span style={{ fontSize: "11px", color: "#756d65", fontWeight: 400 }}>
+            {para.variant}
+          </span>
+          {/* Chevron */}
+          <svg
+            width="10" height="10" viewBox="0 0 24 24" fill="none"
+            stroke="#9c958f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            style={{
+              transition: "transform 0.15s ease",
+              transform: chipDropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
+            }}
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+
+        {/* ── Voice chip dropdown ────────────────────────────────── */}
+        {chipDropdownOpen && (
+          <div style={{
+            position: "absolute",
+            top: "calc(100% + 6px)",
+            left: 0,
+            zIndex: 200,
+            width: "260px",
+            background: "#ffffff",
+            border: "1px solid #eae4de",
+            borderRadius: "14px",
+            boxShadow: "0 8px 32px rgba(42,38,34,0.12)",
+            overflow: "hidden",
+          }}>
+            {/* Voices section */}
+            <div style={{ padding: "10px 0 4px" }}>
+              <div style={{
+                padding: "0 14px 6px",
+                fontSize: "9px", fontWeight: 700, letterSpacing: "0.12em",
+                color: "#b5aca3", textTransform: "uppercase",
+              }}>
+                Voice
+              </div>
+              {allVoices.map((v) => {
+                const isCurrentVoice = para.voiceId === v.id
+                return (
+                  <button
+                    key={v.id}
+                    className="lyric-chip-voice-opt"
+                    onClick={() => {
+                      if (!isCurrentVoice) {
+                        onVoiceChange(v)
+                        setChipDropdownOpen(false)
+                      }
+                    }}
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      padding: "7px 14px",
+                      border: "none",
+                      background: isCurrentVoice ? "rgba(234,228,222,0.5)" : "transparent",
+                      cursor: isCurrentVoice ? "default" : "pointer",
+                      textAlign: "left",
+                    }}
+                  >
+                    <div style={{
+                      width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
+                      background: `linear-gradient(135deg, ${v.gradientFrom}, ${v.gradientTo})`,
+                    }} />
+                    <span style={{
+                      fontSize: "12px",
+                      fontWeight: isCurrentVoice ? 600 : 400,
+                      color: isCurrentVoice ? "#2a2622" : "#756d65",
+                    }}>
+                      {v.title.split("\u00b7")[0].trim()}
+                    </span>
+                    <span style={{
+                      fontSize: "10px", color: "#b5aca3", fontWeight: 400,
+                    }}>
+                      {v.archetype}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Divider */}
+            <div style={{ height: "1px", background: "#eae4de", margin: "4px 14px" }} />
+
+            {/* Expression section */}
+            <div style={{ padding: "8px 14px 12px" }}>
+              <div style={{
+                fontSize: "9px", fontWeight: 700, letterSpacing: "0.12em",
+                color: "#b5aca3", textTransform: "uppercase", marginBottom: "8px",
+              }}>
+                Expression
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                {displayVoice.intents.map((intent) => {
+                  const isActiveIntent = para.variant === intent
+                  return (
+                    <button
+                      key={intent}
+                      className="lyric-chip-expr-opt"
+                      onClick={() => {
+                        onVariantChange(intent)
+                        setChipDropdownOpen(false)
+                      }}
+                      style={{
+                        padding: "4px 12px", borderRadius: "100px",
+                        border: isActiveIntent ? "none" : "1px solid #d4cfc9",
+                        background: isActiveIntent ? "#2a2622" : "transparent",
+                        color: isActiveIntent ? "#faf9f7" : "#756d65",
+                        fontSize: "11px", fontWeight: isActiveIntent ? 500 : 400,
+                        cursor: "pointer", transition: "all 0.12s",
+                      }}
+                    >
+                      {intent}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {canRemove && (
         <button
           onClick={onRemove}
@@ -1727,6 +2043,7 @@ function ParagraphBlock({
         data-first-para={!canRemove ? "true" : undefined}
         onInput={handleInput}
         onMouseUp={handleMouseUp}
+        onFocus={onFocus}
         style={{
           minHeight: "72px",
           fontSize: "20px", lineHeight: "1.85",
