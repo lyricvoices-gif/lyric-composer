@@ -472,6 +472,19 @@ function Composer() {
 
   // Floating voice panel
   const [voicePanelOpen, setVoicePanelOpen] = useState(true)
+  const voicePanelRef = useRef<HTMLDivElement>(null)
+
+  // Close voice panel on outside click
+  useEffect(() => {
+    if (!voicePanelOpen) return
+    function handleClick(e: MouseEvent) {
+      if (voicePanelRef.current && !voicePanelRef.current.contains(e.target as Node)) {
+        setVoicePanelOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClick)
+    return () => document.removeEventListener("mousedown", handleClick)
+  }, [voicePanelOpen])
 
   // Sample audio preview
   const sampleAudioRef = useRef<HTMLAudioElement | null>(null)
@@ -1370,7 +1383,7 @@ function Composer() {
       )}
 
       {/* ── Floating Voice Panel (right side) ──────────────────────────── */}
-      <div style={{
+      <div ref={voicePanelRef} style={{
         position: "fixed",
         right: voicePanelOpen ? "16px" : "-282px",
         top: "50%",
