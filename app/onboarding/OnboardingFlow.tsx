@@ -164,18 +164,23 @@ export default function OnboardingFlow({ isRevisit = false }: { isRevisit?: bool
 
   async function handleSubmit() {
     if (!selectedVoice || !selectedVariant || isSubmitting) return
+    handleSubmitDirect(selectedVoice, selectedVariant)
+  }
+
+  async function handleSubmitDirect(voice: VoiceDefinition, variant: string) {
+    if (isSubmitting) return
     setIsSubmitting(true)
     try {
       await fetch("/api/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          voice: selectedVoice.id,
-          variant: selectedVariant,
-          intent: selectedVariant,
+          voice: voice.id,
+          variant,
+          intent: variant,
         }),
       })
-      router.push(`/?voice=${encodeURIComponent(selectedVoice.id)}&variant=${encodeURIComponent(selectedVariant)}`)
+      router.push(`/?voice=${encodeURIComponent(voice.id)}&variant=${encodeURIComponent(variant)}`)
     } catch {
       setIsSubmitting(false)
     }
@@ -700,7 +705,15 @@ export default function OnboardingFlow({ isRevisit = false }: { isRevisit?: bool
                     <button
                       key={intent}
                       className={`ob-card${isSelected ? " selected" : ""}`}
-                      onClick={() => setSelectedVariant(intent)}
+                      onClick={() => {
+                        setSelectedVariant(intent)
+                        // Auto-advance after brief delay to show selection
+                        setTimeout(() => {
+                          if (!isSubmitting && selectedVoice) {
+                            handleSubmitDirect(selectedVoice, intent)
+                          }
+                        }, 400)
+                      }}
                       style={{
                         display: "flex",
                         alignItems: "center",
