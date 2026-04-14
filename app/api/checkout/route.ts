@@ -92,14 +92,14 @@ export async function POST(req: Request): Promise<Response> {
     }
   }
 
-  // Build the checkout session (embedded mode for Appearance API control)
+  // Build the checkout session
   const sessionParams: Stripe.Checkout.SessionCreateParams = {
     customer: stripeCustomerId,
     mode: "subscription",
     payment_method_types: ["card"],
     line_items: [{ price: priceId, quantity: 1 }],
-    ui_mode: "embedded",
-    return_url: `${appUrl}/checkout/return?session_id={CHECKOUT_SESSION_ID}`,
+    success_url: `${appUrl}/composer?checkout=success`,
+    cancel_url:  `${appUrl}/upgrade`,
     metadata: {
       supabase_user_id: user.id,
       plan_id: body.planId,
@@ -120,5 +120,5 @@ export async function POST(req: Request): Promise<Response> {
 
   const session = await stripe.checkout.sessions.create(sessionParams)
 
-  return Response.json({ clientSecret: session.client_secret })
+  return Response.json({ url: session.url })
 }

@@ -82,14 +82,46 @@ function UpgradeContent() {
     }
   }, [searchParams])
 
-  function handleStartTrial() {
+  async function handleStartTrial() {
     setLoading(true)
-    router.push("/checkout?plan=creator&trial=true")
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId: "creator", trial: true }),
+      })
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        console.error("[upgrade] No checkout URL:", data)
+        setLoading(false)
+      }
+    } catch (err) {
+      console.error("[upgrade] Checkout error:", err)
+      setLoading(false)
+    }
   }
 
-  function handleSubscribe(planId: string) {
+  async function handleSubscribe(planId: string) {
     setLoading(true)
-    router.push(`/checkout?plan=${planId}`)
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId }),
+      })
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        console.error("[upgrade] No checkout URL:", data)
+        setLoading(false)
+      }
+    } catch (err) {
+      console.error("[upgrade] Checkout error:", err)
+      setLoading(false)
+    }
   }
 
   if (!hasAccount) return null
