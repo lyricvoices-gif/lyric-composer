@@ -24,7 +24,6 @@ const FEATURES = [
 
 const TOAST_MESSAGES: Record<string, string> = {
   expired: "Your trial or subscription has ended. Choose a plan to continue using the composer.",
-  no_plan: "Select a plan to get started with the composer.",
 }
 
 export default function UpgradePage() {
