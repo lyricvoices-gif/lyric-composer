@@ -82,46 +82,14 @@ function UpgradeContent() {
     }
   }, [searchParams])
 
-  async function handleStartTrial() {
+  function handleStartTrial() {
     setLoading(true)
-    try {
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId: "creator", trial: true }),
-      })
-      const data = await res.json()
-      if (data.url) {
-        window.location.href = data.url
-      } else {
-        console.error("[upgrade] No checkout URL:", data)
-        setLoading(false)
-      }
-    } catch (err) {
-      console.error("[upgrade] Checkout error:", err)
-      setLoading(false)
-    }
+    router.push("/checkout?plan=creator&trial=true")
   }
 
-  async function handleSubscribe(planId: string) {
+  function handleSubscribe(planId: string) {
     setLoading(true)
-    try {
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId }),
-      })
-      const data = await res.json()
-      if (data.url) {
-        window.location.href = data.url
-      } else {
-        console.error("[upgrade] No checkout URL:", data)
-        setLoading(false)
-      }
-    } catch (err) {
-      console.error("[upgrade] Checkout error:", err)
-      setLoading(false)
-    }
+    router.push(`/checkout?plan=${planId}`)
   }
 
   if (!hasAccount) return null
