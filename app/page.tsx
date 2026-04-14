@@ -1942,7 +1942,7 @@ function ParagraphBlock({
                     onClick={() => {
                       if (!isCurrentVoice) {
                         onVoiceChange(v)
-                        setChipDropdownOpen(false)
+                        // Dropdown stays open so user can pick expression next
                       }
                     }}
                     style={{
