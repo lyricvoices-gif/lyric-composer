@@ -503,8 +503,16 @@ function Composer() {
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
 
-  // Usage — optimistic client-side tracking
+  // Usage — seeded from server, then optimistic client-side tracking
   const [usedToday, setUsedToday] = useState(0)
+
+  // Fetch actual usage on mount so a refresh doesn't reset the count
+  useEffect(() => {
+    fetch("/api/usage")
+      .then((res) => res.json())
+      .then((data) => { if (typeof data.used === "number") setUsedToday(data.used) })
+      .catch(() => {})
+  }, [])
 
   // History panel (left side)
   const [compositions, setCompositions] = useState<Composition[]>([])
