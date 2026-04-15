@@ -751,10 +751,10 @@ function Composer() {
         }
       }
 
-      // Start cycling voice names in the button
-      setGeneratingVoiceName(voiceNameOrder[0])
+      // Start cycling voice names in the button (only for multi-voice)
       let voiceTimer: ReturnType<typeof setInterval> | null = null
       if (voiceNameOrder.length > 1) {
+        setGeneratingVoiceName(voiceNameOrder[0])
         let idx = 0
         // ~12s per voice group — cycle to the next name on a timer
         voiceTimer = setInterval(() => {
@@ -1224,18 +1224,15 @@ function Composer() {
             </span>
           </button>
 
-          {/* Multi-voice latency note */}
-          {(() => {
-            const uniqueParaVoices = new Set(paragraphs.filter((p) => p.text.trim()).map((p) => p.voiceId))
-            return uniqueParaVoices.size > 1 ? (
-              <p style={{
-                fontSize: "11px", color: "#b5aca3", textAlign: "center",
-                margin: "10px 0 0", lineHeight: 1.4,
-              }}>
-                Multi-voice scripts may take longer to generate
-              </p>
-            ) : null
-          })()}
+          {/* Multi-paragraph latency note */}
+          {paragraphs.filter((p) => p.text.trim()).length > 1 && (
+            <p style={{
+              fontSize: "11px", color: "#b5aca3", textAlign: "center",
+              margin: "10px 0 0", lineHeight: 1.4,
+            }}>
+              Multi-voice scripts may take longer to generate
+            </p>
+          )}
 
         </div>
       </main>
