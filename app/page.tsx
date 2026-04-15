@@ -939,12 +939,30 @@ function Composer() {
   // Load compositions on mount
   useEffect(() => { loadCompositions() }, [loadCompositions])
 
+  // Track text selection via selectionchange — avoids mousedown/mouseup
+  // race conditions that caused the emotion toolbar to appear inconsistently
   useEffect(() => {
-    if (!selectionInfo) return
-    function onMouseDown() { setSelectionInfo(null) }
-    document.addEventListener("mousedown", onMouseDown)
-    return () => document.removeEventListener("mousedown", onMouseDown)
-  }, [selectionInfo])
+    function onSelectionChange() {
+      const sel = window.getSelection()
+      if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+        setSelectionInfo(null)
+        return
+      }
+      // Find which paragraph editor contains the selection
+      const anchor = sel.anchorNode
+      if (!anchor) { setSelectionInfo(null); return }
+      const editorEl = (anchor.nodeType === Node.ELEMENT_NODE ? anchor as HTMLElement : anchor.parentElement)?.closest<HTMLElement>("[data-para-id]")
+      if (!editorEl) { setSelectionInfo(null); return }
+      const paraId = editorEl.getAttribute("data-para-id")!
+      const offsets = getSelectionCharOffsets(editorEl)
+      if (!offsets) { setSelectionInfo(null); return }
+      const range = sel.getRangeAt(0)
+      const rect = range.getBoundingClientRect()
+      setSelectionInfo({ paraId, rectLeft: rect.left, rectTop: rect.top, rectWidth: rect.width, offsets })
+    }
+    document.addEventListener("selectionchange", onSelectionChange)
+    return () => document.removeEventListener("selectionchange", onSelectionChange)
+  }, [])
 
   useEffect(() => {
     const audio = audioRef.current
@@ -1174,9 +1192,6 @@ function Composer() {
                 onTextChange={(text) => updateParagraphText(para.id, text)}
                 onRemove={() => removeParagraph(para.id)}
                 canRemove={paragraphs.length > 1}
-                onSelectionChange={(info) =>
-                  setSelectionInfo(info ? { paraId: para.id, ...info } : null)
-                }
                 onMarkRemove={(markId) => removeMark(para.id, markId)}
                 onFocus={() => setFocusedParagraphId(para.id)}
                 onVoiceChange={(voice, variant) => assignVoiceToParagraph(para.id, voice, variant)}
@@ -1853,7 +1868,7 @@ function ParagraphBlock({
   allVoices,
   isFocused,
   onTextChange, onRemove, canRemove,
-  onSelectionChange, onMarkRemove,
+  onMarkRemove,
   onFocus,
   onVoiceChange,
   onVariantChange,
@@ -1865,7 +1880,6 @@ function ParagraphBlock({
   onTextChange: (text: string) => void
   onRemove: () => void
   canRemove: boolean
-  onSelectionChange: (info: { rectLeft: number; rectTop: number; rectWidth: number; offsets: { start: number; end: number } } | null) => void
   onMarkRemove: (markId: string) => void
   onFocus: () => void
   onVoiceChange: (voice: VoiceDefinition, variant?: string) => void
@@ -1910,16 +1924,6 @@ function ParagraphBlock({
     if (!editorRef.current) return
     const raw = editorRef.current.innerText.replace(/\n$/, "")
     onTextChange(raw)
-  }
-
-  function handleMouseUp() {
-    if (!editorRef.current) return
-    const offsets = getSelectionCharOffsets(editorRef.current)
-    if (!offsets) { onSelectionChange(null); return }
-    const sel = window.getSelection()
-    if (!sel || sel.rangeCount === 0) return
-    const rect = sel.getRangeAt(0).getBoundingClientRect()
-    onSelectionChange({ rectLeft: rect.left, rectTop: rect.top, rectWidth: rect.width, offsets })
   }
 
   const displayVoice = voice ?? allVoices[0]
@@ -2105,8 +2109,8 @@ function ParagraphBlock({
         suppressContentEditableWarning
         data-placeholder="Pick a voice, start writing, and highlight any phrase to direct emotion."
         data-first-para={!canRemove ? "true" : undefined}
+        data-para-id={para.id}
         onInput={handleInput}
-        onMouseUp={handleMouseUp}
         onFocus={onFocus}
         style={{
           minHeight: "72px",
