@@ -734,6 +734,7 @@ function Composer() {
     setIsGenerating(true)
     setGenerationError(null)
     const startedAt = Date.now()
+    let voiceTimer: ReturnType<typeof setInterval> | null = null
 
     try {
       const segments = assembleSegments(paragraphs, activeVariant)
@@ -752,7 +753,6 @@ function Composer() {
       }
 
       // Start cycling voice names in the button (only for multi-voice)
-      let voiceTimer: ReturnType<typeof setInterval> | null = null
       if (voiceNameOrder.length > 1) {
         setGeneratingVoiceName(voiceNameOrder[0])
         let idx = 0
