@@ -474,7 +474,9 @@ function Composer() {
   const [voicePanelOpen, setVoicePanelOpen] = useState(true)
   const voicePanelRef = useRef<HTMLDivElement>(null)
 
-  // Close voice panel on outside click
+  // Close voice panel on outside click (uses mouseup to avoid
+  // interfering with text selection in the editor — mousedown would
+  // close the panel mid-drag and shift layout before mouseup fires)
   useEffect(() => {
     if (!voicePanelOpen) return
     function handleClick(e: MouseEvent) {
@@ -482,8 +484,8 @@ function Composer() {
         setVoicePanelOpen(false)
       }
     }
-    document.addEventListener("mousedown", handleClick)
-    return () => document.removeEventListener("mousedown", handleClick)
+    document.addEventListener("mouseup", handleClick)
+    return () => document.removeEventListener("mouseup", handleClick)
   }, [voicePanelOpen])
 
   // Sample audio preview
