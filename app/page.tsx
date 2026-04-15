@@ -492,6 +492,7 @@ function Composer() {
 
   // Generation
   const [isGenerating, setIsGenerating] = useState(false)
+  const [generatingVoiceName, setGeneratingVoiceName] = useState<string | null>(null)
   const [generationError, setGenerationError] = useState<string | null>(null)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
@@ -740,6 +741,30 @@ function Composer() {
       const uniqueVoices = new Set(segments.map((s) => `${s.voiceId}:${s.variant}`))
       const isMultiVoice = uniqueVoices.size > 1
 
+      // Build ordered list of unique voice names for progress display
+      const voiceNameOrder: string[] = []
+      for (const seg of segments) {
+        const v = voices.find((voice) => voice.id === seg.voiceId)
+        const name = v ? v.title.split("\u00b7")[0].trim() : "Voice"
+        if (voiceNameOrder.length === 0 || voiceNameOrder[voiceNameOrder.length - 1] !== name) {
+          voiceNameOrder.push(name)
+        }
+      }
+
+      // Start cycling voice names in the button
+      setGeneratingVoiceName(voiceNameOrder[0])
+      let voiceTimer: ReturnType<typeof setInterval> | null = null
+      if (voiceNameOrder.length > 1) {
+        let idx = 0
+        // ~12s per voice group — cycle to the next name on a timer
+        voiceTimer = setInterval(() => {
+          idx++
+          if (idx < voiceNameOrder.length) {
+            setGeneratingVoiceName(voiceNameOrder[idx])
+          }
+        }, 12000)
+      }
+
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -797,6 +822,8 @@ function Composer() {
     } catch (err) {
       setGenerationError(err instanceof Error ? err.message : "Generation failed")
     } finally {
+      if (voiceTimer) clearInterval(voiceTimer)
+      setGeneratingVoiceName(null)
       setIsGenerating(false)
     }
   }
@@ -1189,9 +1216,26 @@ function Composer() {
               />
             )}
             <span style={{ position: "relative", zIndex: 1 }}>
-              {isGenerating ? "Generating…" : isAtLimit ? "Daily limit reached" : "Generate"}
+              {isGenerating
+                ? generatingVoiceName
+                  ? `Generating ${generatingVoiceName}…`
+                  : "Generating…"
+                : isAtLimit ? "Daily limit reached" : "Generate"}
             </span>
           </button>
+
+          {/* Multi-voice latency note */}
+          {(() => {
+            const uniqueParaVoices = new Set(paragraphs.filter((p) => p.text.trim()).map((p) => p.voiceId))
+            return uniqueParaVoices.size > 1 ? (
+              <p style={{
+                fontSize: "11px", color: "#b5aca3", textAlign: "center",
+                margin: "10px 0 0", lineHeight: 1.4,
+              }}>
+                Multi-voice scripts may take longer to generate
+              </p>
+            ) : null
+          })()}
 
         </div>
       </main>
