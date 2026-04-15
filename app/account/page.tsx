@@ -22,6 +22,8 @@ export default function AccountPage() {
   const [cancelling, setCancelling] = useState(false)
   const [cancelled, setCancelled] = useState(false)
   const [cancelType, setCancelType] = useState<"trial" | "subscription" | null>(null)
+  const [upgrading, setUpgrading] = useState(false)
+  const [showUpgradePlans, setShowUpgradePlans] = useState(false)
 
   useEffect(() => {
     const supabase = createClient()
@@ -69,6 +71,27 @@ export default function AccountPage() {
     }
   }
 
+  async function handleUpgrade(planId: string) {
+    setUpgrading(true)
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId }),
+      })
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        console.error("[account] No checkout URL:", data)
+        setUpgrading(false)
+      }
+    } catch (err) {
+      console.error("[account] Upgrade error:", err)
+      setUpgrading(false)
+    }
+  }
+
   if (!loaded) {
     return <div style={{ minHeight: "100vh", background: DARK }} />
   }
@@ -82,6 +105,10 @@ export default function AccountPage() {
         .acct-cancel-link:hover { color: rgba(245,243,239,0.65) !important; }
         .acct-confirm-btn { transition: all 0.15s; }
         .acct-confirm-btn:not(:disabled):hover { opacity: 0.85 !important; }
+        .acct-upgrade-btn { transition: all 0.15s; }
+        .acct-upgrade-btn:not(:disabled):hover { opacity: 0.9 !important; }
+        .acct-plan-btn { transition: all 0.15s; }
+        .acct-plan-btn:not(:disabled):hover { background: rgba(255,255,255,0.07) !important; }
       `}</style>
 
       <div style={{
@@ -171,7 +198,7 @@ export default function AccountPage() {
                         textDecoration: "none",
                       }}
                     >
-                      Choose a plan →
+                      Choose a plan &rarr;
                     </a>
                   </>
                 )}
@@ -244,6 +271,106 @@ export default function AccountPage() {
                     </p>
                   </div>
                 </div>
+
+                {/* Upgrade section — trial users only */}
+                {isTrial && !isEnterprise && (
+                  <div style={{ marginBottom: "24px" }}>
+                    {!showUpgradePlans ? (
+                      <button
+                        className="acct-upgrade-btn"
+                        onClick={() => setShowUpgradePlans(true)}
+                        disabled={upgrading}
+                        style={{
+                          width: "100%", padding: "12px",
+                          borderRadius: "100px", border: "none",
+                          background: GOLD,
+                          color: DARK,
+                          fontSize: "13px", fontWeight: 600,
+                          letterSpacing: "-0.01em",
+                          cursor: upgrading ? "not-allowed" : "pointer",
+                          opacity: upgrading ? 0.6 : 1,
+                        }}
+                      >
+                        Subscribe now
+                      </button>
+                    ) : (
+                      <div style={{
+                        display: "flex", flexDirection: "column",
+                        gap: "8px",
+                      }}>
+                        <p style={{
+                          fontSize: "10px", fontWeight: 700,
+                          letterSpacing: "0.15em", color: GOLD,
+                          textTransform: "uppercase",
+                          margin: "0 0 4px", textAlign: "center",
+                        }}>
+                          Subscribe now
+                        </p>
+
+                        {/* Creator */}
+                        <button
+                          className="acct-plan-btn"
+                          onClick={() => handleUpgrade("creator")}
+                          disabled={upgrading}
+                          style={{
+                            width: "100%", padding: "12px 16px",
+                            borderRadius: "10px",
+                            border: `1px solid ${BORDER}`,
+                            background: "rgba(255,255,255,0.04)",
+                            color: LIGHT,
+                            fontSize: "13px", fontWeight: 500,
+                            cursor: upgrading ? "not-allowed" : "pointer",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            opacity: upgrading ? 0.6 : 1,
+                          }}
+                        >
+                          <span>Creator</span>
+                          <span style={{ color: MUTED }}>$29 / mo</span>
+                        </button>
+
+                        {/* Studio */}
+                        <button
+                          className="acct-plan-btn"
+                          onClick={() => handleUpgrade("studio")}
+                          disabled={upgrading}
+                          style={{
+                            width: "100%", padding: "12px 16px",
+                            borderRadius: "10px",
+                            border: `1px solid rgba(201,169,110,0.3)`,
+                            background: "rgba(201,169,110,0.06)",
+                            color: LIGHT,
+                            fontSize: "13px", fontWeight: 500,
+                            cursor: upgrading ? "not-allowed" : "pointer",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            opacity: upgrading ? 0.6 : 1,
+                          }}
+                        >
+                          <span>Studio</span>
+                          <span style={{ color: GOLD }}>$99 / mo</span>
+                        </button>
+
+                        {/* Enterprise */}
+                        <p style={{
+                          fontSize: "12px", color: MUTED,
+                          textAlign: "center", margin: "4px 0 0",
+                          lineHeight: 1.6,
+                        }}>
+                          Need Enterprise?{" "}
+                          <a
+                            href="mailto:hello@lyricvoices.ai"
+                            style={{ color: GOLD, textDecoration: "none" }}
+                          >
+                            Contact us
+                          </a>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Cancel section */}
                 {isEnterprise ? (
