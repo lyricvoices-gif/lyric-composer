@@ -274,10 +274,11 @@ async function activatePlan(
   planId: string,
   trialEndsAt: string | null,
 ): Promise<void> {
-  // Build app_metadata update
-  const metadataUpdate: Record<string, unknown> = { plan_tier: planId }
-  if (trialEndsAt) {
-    metadataUpdate.trial_ends_at = trialEndsAt
+  // Build app_metadata update — always set trial_ends_at explicitly so
+  // an early upgrade clears the existing trial date rather than leaving it active
+  const metadataUpdate: Record<string, unknown> = {
+    plan_tier: planId,
+    trial_ends_at: trialEndsAt ?? null,
   }
 
   try {
