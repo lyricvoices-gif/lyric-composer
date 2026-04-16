@@ -119,13 +119,32 @@ export default function AccountPage() {
       }}>
         {/* Topbar */}
         <header style={{
-          height: "52px", padding: "0 24px",
+          height: "60px", padding: "0 24px",
           display: "flex", alignItems: "center",
+          justifyContent: "space-between",
           borderBottom: `1px solid ${BORDER}`,
         }}>
           <a href="/" style={{ textDecoration: "none", display: "flex", alignItems: "center" }}>
             <Wordmark height={32} color={LIGHT} />
           </a>
+          {!cancelled && (
+            <a
+              href="/"
+              className="acct-back"
+              style={{
+                padding: "8px 18px",
+                borderRadius: "100px",
+                fontSize: "13px",
+                fontWeight: 500,
+                color: DARK,
+                background: LIGHT,
+                textDecoration: "none",
+                letterSpacing: "-0.01em",
+              }}
+            >
+              Back to composer
+            </a>
+          )}
         </header>
 
         {/* Main */}
@@ -272,9 +291,9 @@ export default function AccountPage() {
                   </div>
                 </div>
 
-                {/* Upgrade section — trial users only */}
-                {isTrial && !isEnterprise && (
-                  <div style={{ marginBottom: "24px" }}>
+                {/* Upgrade + Cancel section — trial users */}
+                {isTrial && !isEnterprise ? (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "16px" }}>
                     {!showUpgradePlans ? (
                       <button
                         className="acct-upgrade-btn"
@@ -294,10 +313,7 @@ export default function AccountPage() {
                         Subscribe now
                       </button>
                     ) : (
-                      <div style={{
-                        display: "flex", flexDirection: "column",
-                        gap: "8px",
-                      }}>
+                      <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "8px" }}>
                         <p style={{
                           fontSize: "10px", fontWeight: 700,
                           letterSpacing: "0.15em", color: GOLD,
@@ -369,11 +385,76 @@ export default function AccountPage() {
                         </p>
                       </div>
                     )}
-                  </div>
-                )}
 
-                {/* Cancel section */}
-                {isEnterprise ? (
+                    {/* Cancel trial — centered below upgrade */}
+                    {!showConfirm ? (
+                      <button
+                        onClick={() => setShowConfirm(true)}
+                        className="acct-cancel-link"
+                        style={{
+                          background: "none", border: "none",
+                          color: "rgba(245,243,239,0.3)",
+                          fontSize: "12px", cursor: "pointer",
+                          padding: 0,
+                        }}
+                      >
+                        Cancel trial
+                      </button>
+                    ) : (
+                      <div style={{ width: "100%", textAlign: "center" }}>
+                        <p style={{
+                          fontSize: "13px", color: MUTED,
+                          margin: "0 0 14px", lineHeight: 1.5,
+                        }}>
+                          Are you sure? Your trial will end immediately and no charges will be made.
+                        </p>
+                        {cancelError && (
+                          <p style={{
+                            fontSize: "12px", color: "#e5736a",
+                            margin: "0 0 12px", lineHeight: 1.5,
+                          }}>
+                            {cancelError}
+                          </p>
+                        )}
+                        <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
+                          <button
+                            onClick={handleCancel}
+                            disabled={cancelling}
+                            className="acct-confirm-btn"
+                            style={{
+                              padding: "8px 16px",
+                              borderRadius: "100px",
+                              border: `1px solid ${BORDER}`,
+                              background: "transparent",
+                              color: MUTED,
+                              fontSize: "12px", fontWeight: 500,
+                              cursor: cancelling ? "not-allowed" : "pointer",
+                              opacity: cancelling ? 0.5 : 1,
+                            }}
+                          >
+                            {cancelling ? "Cancelling\u2026" : "Yes, cancel"}
+                          </button>
+                          <button
+                            onClick={() => { setShowConfirm(false); setCancelError(null) }}
+                            className="acct-confirm-btn"
+                            style={{
+                              padding: "8px 16px",
+                              borderRadius: "100px",
+                              border: "none",
+                              background: GOLD,
+                              color: DARK,
+                              fontSize: "12px", fontWeight: 500,
+                              cursor: "pointer",
+                            }}
+                          >
+                            Never mind
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : isEnterprise ? (
+                  /* Enterprise — contact only */
                   <p style={{ fontSize: "12px", color: MUTED, margin: 0 }}>
                     To manage your Enterprise plan,{" "}
                     <a href="mailto:hello@lyricvoices.ai" style={{ color: GOLD, textDecoration: "none" }}>
@@ -381,6 +462,7 @@ export default function AccountPage() {
                     </a>
                   </p>
                 ) : !showConfirm ? (
+                  /* Active subscriber — cancel link */
                   <button
                     onClick={() => setShowConfirm(true)}
                     className="acct-cancel-link"
@@ -391,17 +473,16 @@ export default function AccountPage() {
                       padding: 0,
                     }}
                   >
-                    {isTrial ? "Cancel trial" : "Cancel subscription"}
+                    Cancel subscription
                   </button>
                 ) : (
+                  /* Active subscriber — cancel confirm */
                   <div>
                     <p style={{
                       fontSize: "13px", color: MUTED,
                       margin: "0 0 14px", lineHeight: 1.5,
                     }}>
-                      {isTrial
-                        ? "Are you sure? Your trial will end immediately and no charges will be made."
-                        : "Are you sure? Your access will end immediately."}
+                      Are you sure? Your access will end immediately.
                     </p>
                     {cancelError && (
                       <p style={{
@@ -448,26 +529,6 @@ export default function AccountPage() {
                   </div>
                 )}
               </div>
-            )}
-
-            {/* Back button — hidden after cancellation */}
-            {!cancelled && (
-              <a
-                href="/"
-                className="acct-back"
-                style={{
-                  padding: "10px 24px",
-                  borderRadius: "100px",
-                  fontSize: "13px",
-                  fontWeight: 500,
-                  color: DARK,
-                  background: LIGHT,
-                  textDecoration: "none",
-                  letterSpacing: "-0.01em",
-                }}
-              >
-                Back to composer
-              </a>
             )}
           </div>
         </main>
