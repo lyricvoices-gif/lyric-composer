@@ -84,6 +84,26 @@ export async function POST(req: Request): Promise<Response> {
 
     await activatePlan(userId, planId, trialEndsAt)
 
+    // Send subscription confirmed email for direct (non-trial) checkouts
+    if (!isTrial) {
+      try {
+        const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(userId)
+        if (user) {
+          const email = user.email ?? (user.user_metadata?.email as string | undefined) ?? ""
+          const firstName =
+            (user.user_metadata?.full_name as string | undefined)?.split(" ")[0] ??
+            (user.user_metadata?.name as string | undefined)?.split(" ")[0] ??
+            undefined
+          if (email) {
+            const planName = planId === "studio" ? "Studio" : "Creator"
+            await sendSubscriptionConfirmed({ to: email, firstName, planName, amount: planId === "studio" ? "$99" : "$29" })
+          }
+        }
+      } catch (err) {
+        console.error("[webhook/stripe] Failed to send subscription confirmed email:", err)
+      }
+    }
+
     // Send trial email sequence if this is a trial start
     if (isTrial && trialEndsAt) {
       try {
@@ -133,7 +153,9 @@ export async function POST(req: Request): Promise<Response> {
     const customerId = invoice.customer as string
 
     // Only send on first real charge after trial (not the $0 trial invoice)
-    if (invoice.amount_paid > 0 && (invoice.billing_reason === "subscription_cycle" || invoice.billing_reason === "subscription_create")) {
+    // subscription_cycle covers natural trial conversion + monthly renewals
+    // subscription_create is handled by checkout.session.completed to avoid duplicate sends
+    if (invoice.amount_paid > 0 && invoice.billing_reason === "subscription_cycle") {
       try {
         const { email, firstName, userId } = await lookupUserByCustomerId(customerId)
         if (email && userId) {
