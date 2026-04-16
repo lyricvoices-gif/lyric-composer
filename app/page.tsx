@@ -508,6 +508,10 @@ function Composer() {
   // Usage — seeded from server, then optimistic client-side tracking
   const [usedToday, setUsedToday] = useState(0)
 
+  // Subscription success toast (shown once after checkout redirect)
+  const [showSuccessToast, setShowSuccessToast] = useState(false)
+  const [successToastVisible, setSuccessToastVisible] = useState(false)
+
   // Fetch actual usage on mount so a refresh doesn't reset the count
   useEffect(() => {
     fetch("/api/usage")
@@ -515,6 +519,22 @@ function Composer() {
       .then((data) => { if (typeof data.used === "number") setUsedToday(data.used) })
       .catch(() => {})
   }, [])
+
+  // Show success toast when redirected back from Stripe checkout
+  useEffect(() => {
+    if (searchParams.get("checkout") === "success") {
+      setShowSuccessToast(true)
+      requestAnimationFrame(() => setSuccessToastVisible(true))
+      // Clean up URL param
+      if (window.history.replaceState) window.history.replaceState({}, "", "/")
+      // Auto-dismiss after 6 seconds
+      const t = setTimeout(() => {
+        setSuccessToastVisible(false)
+        setTimeout(() => setShowSuccessToast(false), 300)
+      }, 6000)
+      return () => clearTimeout(t)
+    }
+  }, [searchParams])
 
   // History panel (left side)
   const [compositions, setCompositions] = useState<Composition[]>([])
@@ -1073,10 +1093,43 @@ function Composer() {
           0% { background-position: 100% 0; }
           100% { background-position: -100% 0; }
         }
+        @keyframes lyric-toast-in {
+          from { opacity: 0; transform: translate(-50%, -6px); }
+          to { opacity: 1; transform: translate(-50%, 0); }
+        }
       `}</style>
 
       {/* Hidden audio */}
       <audio ref={audioRef} src={audioUrl ?? undefined} preload="metadata" style={{ display: "none" }} />
+
+      {/* ── Subscription success toast ──────────────────────────────────── */}
+      {showSuccessToast && (
+        <div style={{
+          position: "fixed",
+          top: "20px",
+          left: "50%",
+          transform: successToastVisible ? "translate(-50%, 0)" : "translate(-50%, -6px)",
+          zIndex: 400,
+          maxWidth: "420px",
+          width: "calc(100% - 48px)",
+          padding: "14px 20px",
+          borderRadius: "12px",
+          background: "rgba(43,42,37,0.96)",
+          border: "1px solid rgba(201,169,110,0.3)",
+          backdropFilter: "blur(16px)",
+          color: "#f5f3ef",
+          fontSize: "13px",
+          lineHeight: 1.5,
+          textAlign: "center",
+          opacity: successToastVisible ? 1 : 0,
+          transition: "opacity 0.3s ease, transform 0.3s ease",
+          animation: successToastVisible ? "lyric-toast-in 0.3s ease" : "none",
+          pointerEvents: "none",
+        }}>
+          <span style={{ color: "#c9a96e", marginRight: "8px" }}>✓</span>
+          {"You're now subscribed. Welcome to " + plan.label + "."}
+        </div>
+      )}
 
       {/* ── Payment failed banner (subscribers only, not trial) ─────────── */}
       {paymentFailed && !isTrialActive(trialEndsAt) && (
@@ -1125,8 +1178,8 @@ function Composer() {
                   {remaining} generations left today
                 </span>
               )}
-              <span style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.08em", padding: "2px 8px", borderRadius: "100px", background: "#eae4de", color: "#756d65", textTransform: "uppercase" }}>
-                {plan.label}
+              <span style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.08em", padding: "2px 8px", borderRadius: "100px", background: isTrialActive(trialEndsAt) ? "rgba(184,149,90,0.15)" : "#eae4de", color: isTrialActive(trialEndsAt) ? "#B8955A" : "#756d65", textTransform: "uppercase" }}>
+                {isTrialActive(trialEndsAt) ? "Trial" : plan.label}
               </span>
             </>
           )}
