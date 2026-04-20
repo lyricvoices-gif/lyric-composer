@@ -34,6 +34,8 @@ import {
   sendCancellationConfirmed,
   cancelScheduledEmails,
 } from "@/lib/email"
+import { sendAdminAlert } from "@/lib/alerts"
+import { insertUserEvent } from "@/lib/events"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
@@ -84,6 +86,13 @@ export async function POST(req: Request): Promise<Response> {
 
     await activatePlan(userId, planId, trialEndsAt)
 
+    await insertUserEvent({
+      userId,
+      eventType: "checkout_completed",
+      planTier: planId,
+      metadata: { is_trial: isTrial, session_id: session.id },
+    })
+
     // Send subscription confirmed email for direct (non-trial) checkouts
     if (!isTrial) {
       try {
@@ -97,6 +106,20 @@ export async function POST(req: Request): Promise<Response> {
           if (email) {
             const planName = planId === "studio" ? "Studio" : "Creator"
             await sendSubscriptionConfirmed({ to: email, firstName, planName, amount: planId === "studio" ? "$99" : "$29" })
+          }
+
+          // If this is an early upgrade from a trial, cancel the pending
+          // Day 5 / Day 6 trial emails so they don't fire post-upgrade.
+          try {
+            const scheduledEmailIds = (user.app_metadata?.scheduled_email_ids as string[] | undefined) ?? []
+            if (scheduledEmailIds.length > 0) {
+              await cancelScheduledEmails(scheduledEmailIds)
+              await supabaseAdmin.auth.admin.updateUserById(userId, {
+                app_metadata: { scheduled_email_ids: null },
+              })
+            }
+          } catch (cancelErr) {
+            console.error("[webhook/stripe] Failed to cancel scheduled emails on early upgrade:", cancelErr)
           }
         }
       } catch (err) {
@@ -172,6 +195,17 @@ export async function POST(req: Request): Promise<Response> {
           await supabaseAdmin.auth.admin.updateUserById(userId, {
             app_metadata: { scheduled_email_ids: null, payment_failed: null },
           })
+
+          // Mark trial as converted if this is the first paid cycle after a trial.
+          // trial_funnel view reads this column.
+          const sql = db()
+          await sql`
+            UPDATE user_profiles
+            SET trial_converted = TRUE
+            WHERE user_id = ${userId}
+              AND trial_ends_at IS NOT NULL
+              AND trial_converted = FALSE
+          `
         }
       } catch (err) {
         console.error("[webhook/stripe] Failed to send subscription confirmed email:", err)
@@ -195,6 +229,31 @@ export async function POST(req: Request): Promise<Response> {
           app_metadata: { payment_failed: true },
         })
       }
+
+      await insertUserEvent({
+        userId: userId ?? null,
+        eventType: "payment_failed",
+        metadata: {
+          customer_id: customerId,
+          invoice_id: invoice.id,
+          amount_due: invoice.amount_due,
+          email,
+        },
+      })
+
+      await sendAdminAlert({
+        subject: `Payment failed — ${email ?? customerId}`,
+        body: [
+          `Stripe invoice.payment_failed fired.`,
+          ``,
+          `User: ${email ?? "(unknown)"}`,
+          `Customer: ${customerId}`,
+          `Invoice: ${invoice.id}`,
+          `Amount due: $${((invoice.amount_due ?? 0) / 100).toFixed(2)}`,
+          ``,
+          `A customer-facing email has already been sent.`,
+        ].join("\n"),
+      })
     } catch (err) {
       console.error("[webhook/stripe] Failed to send payment failed email:", err)
     }
@@ -210,6 +269,31 @@ export async function POST(req: Request): Promise<Response> {
 
       if (userId) {
         await deactivatePlan(userId)
+
+        // Flip trial_cancelled if the subscription was cancelled during an active trial.
+        // trial_funnel view reads this column.
+        const sql = db()
+        const profileRows = await sql`
+          SELECT trial_ends_at, trial_converted
+          FROM user_profiles
+          WHERE user_id = ${userId}
+          LIMIT 1
+        `
+        const profile = profileRows[0] as
+          | { trial_ends_at: string | null; trial_converted: boolean }
+          | undefined
+        const cancelledDuringTrial =
+          !!profile?.trial_ends_at &&
+          new Date(profile.trial_ends_at) > new Date() &&
+          !profile.trial_converted
+
+        if (cancelledDuringTrial) {
+          await sql`
+            UPDATE user_profiles
+            SET trial_cancelled = TRUE
+            WHERE user_id = ${userId}
+          `
+        }
 
         // Send cancellation confirmation email
         if (email) {
@@ -229,6 +313,29 @@ export async function POST(req: Request): Promise<Response> {
         } catch (cancelErr) {
           console.error("[webhook/stripe] Failed to cancel scheduled emails:", cancelErr)
         }
+
+        await insertUserEvent({
+          userId,
+          eventType: "subscription_cancelled",
+          metadata: {
+            customer_id: customerId,
+            email,
+            cancelled_during_trial: cancelledDuringTrial,
+          },
+        })
+
+        await sendAdminAlert({
+          subject: `Subscription cancelled — ${email ?? customerId}`,
+          body: [
+            `Stripe customer.subscription.deleted fired.`,
+            ``,
+            `User: ${email ?? "(unknown)"}`,
+            `Customer: ${customerId}`,
+            `Cancelled during trial: ${cancelledDuringTrial ? "yes" : "no"}`,
+            ``,
+            `A cancellation confirmation email has been sent to the user.`,
+          ].join("\n"),
+        })
       }
     } catch (err) {
       console.error("[webhook/stripe] Failed to handle subscription deletion:", err)

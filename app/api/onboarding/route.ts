@@ -9,6 +9,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin"
 import { neon } from "@neondatabase/serverless"
 import { getAllVoices } from "@/lib/voiceData"
 import type { VoiceId } from "@/lib/voiceData"
+import { insertUserEvent } from "@/lib/events"
 
 export async function POST(req: Request): Promise<Response> {
   const supabase = await createClient()
@@ -22,6 +23,23 @@ export async function POST(req: Request): Promise<Response> {
     body = await req.json()
   } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400 })
+  }
+
+  // ── Track a step advance during the onboarding flow ─────────────────────
+  if (body.action === "track_step") {
+    const step = Number(body.step)
+    if (!Number.isFinite(step) || step < 1 || step > 10) {
+      return Response.json({ error: "Invalid step" }, { status: 400 })
+    }
+    insertUserEvent({
+      userId: user.id,
+      eventType: "onboarding_step",
+      metadata: {
+        step,
+        is_revisit: body.isRevisit === "true" || (body.isRevisit as unknown) === true,
+      },
+    })
+    return Response.json({ ok: true })
   }
 
   // ── Save last-used voice (called from composer after generation) ───────
@@ -41,6 +59,7 @@ export async function POST(req: Request): Promise<Response> {
 
   // ── Complete onboarding ────────────────────────────────────────────────
   const { voice, variant, intent } = body
+  const isRevisit = body.isRevisit === "true" || (body.isRevisit as unknown) === true
 
   if (!voice || !variant || !intent) {
     return Response.json(
@@ -48,6 +67,11 @@ export async function POST(req: Request): Promise<Response> {
       { status: 400 }
     )
   }
+
+  // First-time completion = user wasn't already marked complete AND isRevisit is false.
+  // Captured before we overwrite app_metadata below.
+  const wasAlreadyComplete = user.app_metadata?.onboarding_complete === true
+  const isFirstTimeCompletion = !isRevisit && !wasAlreadyComplete
 
   // Validate voice + variant against canonical data
   const voices = getAllVoices()
@@ -93,6 +117,20 @@ export async function POST(req: Request): Promise<Response> {
     console.error("[api/onboarding] Failed to mirror to user_profiles:", err)
     // Non-fatal — app_metadata is the source of truth
   }
+
+  // Record the completion event. First-time completion is what the dashboard
+  // funnel counts — revisits are logged but marked so they're excluded.
+  insertUserEvent({
+    userId: user.id,
+    eventType: "onboarding_completed",
+    metadata: {
+      voice,
+      variant,
+      intent,
+      is_revisit: isRevisit,
+      is_first_time: isFirstTimeCompletion,
+    },
+  })
 
   return Response.json({ ok: true })
 }

@@ -107,11 +107,24 @@ function StepContent({ children, stepKey }: { children: React.ReactNode; stepKey
 
 const TOTAL_STEPS = 5
 
+function trackOnboardingStep(step: number, isRevisit: boolean) {
+  fetch("/api/onboarding", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "track_step", step, isRevisit }),
+  }).catch(() => {})
+}
+
 export default function OnboardingFlow({ isRevisit = false }: { isRevisit?: boolean }) {
   const router = useRouter()
   const voices = getAllVoices()
 
   const [step, setStep] = useState(1)
+
+  // Track each step the user lands on (first-time vs revisit differentiated on server)
+  useEffect(() => {
+    trackOnboardingStep(step, isRevisit)
+  }, [step, isRevisit])
   const [recommendedId, setRecommendedId] = useState<string | null>(null)
   const [selectedVoice, setSelectedVoice] = useState<VoiceDefinition | null>(null)
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null)
@@ -178,6 +191,7 @@ export default function OnboardingFlow({ isRevisit = false }: { isRevisit?: bool
           voice: voice.id,
           variant,
           intent: variant,
+          isRevisit,
         }),
       })
       router.push(`/?voice=${encodeURIComponent(voice.id)}&variant=${encodeURIComponent(variant)}`)

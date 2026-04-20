@@ -17,6 +17,8 @@ import { createClient } from "@/lib/supabase/server"
 import { neon } from "@neondatabase/serverless"
 import { getVoice, VoiceId } from "@/lib/voiceData"
 import { getPlanConfig, isUnderDailyLimit, remainingGenerations, resolvePlanId } from "@/lib/planConfig"
+import { insertUserEvent } from "@/lib/events"
+import { sendAdminAlert } from "@/lib/alerts"
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -316,7 +318,19 @@ export async function POST(req: Request): Promise<Response> {
       body: JSON.stringify({ voiceId, variant, script, direction, segments: enrichedSegments, multiVoice: !!multiVoice }),
     })
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
     console.error("[generate] Worker fetch failed:", err)
+    insertUserEvent({
+      userId: user.id,
+      eventType: "generation_error",
+      planTier,
+      metadata: { stage: "worker_fetch", voice_id: voiceId, variant, error: message },
+    })
+    sendAdminAlert({
+      subject: "Generation error — worker unreachable",
+      body: `Cloudflare worker fetch failed.\n\nUser: ${user.id}\nVoice: ${voiceId} / ${variant}\nError: ${message}`,
+      dedupeKey: "generation_error:worker_fetch",
+    })
     return Response.json(
       { error: "Failed to reach voice worker" },
       { status: 502 }
@@ -326,6 +340,30 @@ export async function POST(req: Request): Promise<Response> {
   if (!workerRes.ok) {
     const detail = await workerRes.text().catch(() => "(no body)")
     console.error(`[generate] Worker returned ${workerRes.status}:`, detail)
+    insertUserEvent({
+      userId: user.id,
+      eventType: "generation_error",
+      planTier,
+      metadata: {
+        stage: "worker_status",
+        worker_status: workerRes.status,
+        voice_id: voiceId,
+        variant,
+        detail: detail.slice(0, 500),
+      },
+    })
+    sendAdminAlert({
+      subject: `Generation error — worker ${workerRes.status}`,
+      body: [
+        `Cloudflare worker returned non-OK status.`,
+        ``,
+        `User: ${user.id}`,
+        `Voice: ${voiceId} / ${variant}`,
+        `Status: ${workerRes.status}`,
+        `Detail: ${detail.slice(0, 500)}`,
+      ].join("\n"),
+      dedupeKey: `generation_error:worker_status:${workerRes.status}`,
+    })
     return Response.json(
       { error: "Voice worker error", workerStatus: workerRes.status, detail },
       { status: 502 }

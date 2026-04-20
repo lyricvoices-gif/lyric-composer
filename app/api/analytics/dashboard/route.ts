@@ -64,6 +64,7 @@ export async function GET(req: NextRequest) {
       stripeData,
       trialData,
       genomeData,
+      observabilityData,
     ] = await Promise.all([
       // ── Overview totals ──────────────────────────────────────────────────
       sql`
@@ -176,6 +177,9 @@ export async function GET(req: NextRequest) {
 
       // ── Voice genome: download/regen performance, use case breakdown ──────
       fetchGenomeData(),
+
+      // ── Observability: errors, checkout funnel, DAU, onboarding funnel ────
+      fetchObservabilityData(range),
     ])
 
     return NextResponse.json({
@@ -192,6 +196,7 @@ export async function GET(req: NextRequest) {
       stripe: stripeData,
       trial: trialData,
       genome: genomeData,
+      observability: observabilityData,
     })
   } catch (err) {
     console.error("[analytics/dashboard] Error:", err)
@@ -321,6 +326,57 @@ async function fetchStripeData() {
   } catch (err) {
     console.error("[analytics/dashboard] Stripe fetch failed:", err)
     return { error: "Stripe data unavailable" }
+  }
+}
+
+// ─── Observability data fetcher ───────────────────────────────────────────────
+
+async function fetchObservabilityData(rangeDays: number) {
+  try {
+    const sql = getDb()
+    const since = daysAgo(rangeDays).toISOString()
+
+    const [errorTotals, errorDaily, checkoutFunnel, activeUsers, dauDaily, onboardingFunnel] =
+      await Promise.all([
+        sql`
+          SELECT
+            COUNT(*)                                                  AS total_errors,
+            COUNT(DISTINCT user_id)                                   AS affected_users,
+            COUNT(*) FILTER (WHERE metadata->>'stage' = 'worker_fetch')  AS worker_fetch_errors,
+            COUNT(*) FILTER (WHERE metadata->>'stage' = 'worker_status') AS worker_status_errors
+          FROM user_events
+          WHERE event_type = 'generation_error'
+            AND created_at >= ${since}
+        `,
+        sql`
+          SELECT
+            DATE(created_at) AS date,
+            COUNT(*)         AS errors
+          FROM user_events
+          WHERE event_type = 'generation_error'
+            AND created_at >= ${since}
+          GROUP BY DATE(created_at)
+          ORDER BY date ASC
+        `,
+        sql`SELECT * FROM checkout_funnel`,
+        sql`SELECT * FROM active_users_stats`,
+        sql`SELECT * FROM active_users_daily`,
+        sql`SELECT * FROM onboarding_funnel`,
+      ])
+
+    return {
+      errors: {
+        totals: errorTotals[0] ?? {},
+        daily: errorDaily,
+      },
+      checkout_funnel: checkoutFunnel[0] ?? null,
+      active_users: activeUsers[0] ?? null,
+      active_users_daily: dauDaily,
+      onboarding_funnel: onboardingFunnel[0] ?? null,
+    }
+  } catch (err) {
+    console.error("[analytics/dashboard] Observability fetch failed:", err)
+    return { error: "Observability data unavailable" }
   }
 }
 

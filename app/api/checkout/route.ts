@@ -16,6 +16,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { neon } from "@neondatabase/serverless"
 import Stripe from "stripe"
+import { insertUserEvent } from "@/lib/events"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
@@ -119,6 +120,17 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const session = await stripe.checkout.sessions.create(sessionParams)
+
+  insertUserEvent({
+    userId: user.id,
+    eventType: "checkout_started",
+    planTier: body.planId,
+    metadata: {
+      is_trial: !!body.trial,
+      session_id: session.id,
+      price_id: priceId,
+    },
+  })
 
   return Response.json({ url: session.url })
 }
