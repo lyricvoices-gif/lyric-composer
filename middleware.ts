@@ -41,9 +41,16 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse
   }
 
-  // Require sign-in for everything else
+  // Require sign-in for everything else — preserve original URL as ?next=
+  // so the sign-in/callback flow can return the user to where they were headed
+  // (e.g. /account from a trial email link).
   if (!user) {
-    return NextResponse.redirect(new URL("/sign-in", request.url))
+    const signInUrl = new URL("/sign-in", request.url)
+    const nextPath = path + (request.nextUrl.search ?? "")
+    if (nextPath && nextPath !== "/" && !nextPath.startsWith("/sign-in")) {
+      signInUrl.searchParams.set("next", nextPath)
+    }
+    return NextResponse.redirect(signInUrl)
   }
 
   // Upgrade + onboarding are accessible once signed in — no deeper checks

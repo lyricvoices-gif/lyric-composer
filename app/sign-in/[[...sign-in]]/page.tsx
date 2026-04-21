@@ -2,8 +2,19 @@
 
 import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Wordmark from "@/components/Wordmark"
+
+/**
+ * Validates a `next` query param as a safe same-origin path.
+ * Guards against open-redirect via //evil.com or absolute URLs.
+ */
+function safeNext(raw: string | null): string | null {
+  if (!raw) return null
+  if (!raw.startsWith("/") || raw.startsWith("//")) return null
+  if (raw.startsWith("/sign-in") || raw.startsWith("/auth")) return null
+  return raw
+}
 
 // ── Design tokens ────────────────────────────────────────────────────────────
 const DARK = "#2b2a25"
@@ -17,6 +28,8 @@ type Step = "input" | "otp"
 
 export default function SignInPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const next = safeNext(searchParams.get("next"))
   const [step, setStep] = useState<Step>("input")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -38,9 +51,12 @@ export default function SignInPage() {
     setLoading(true)
     setError(null)
     const supabase = createClient()
+    // Forward ?next= through the OAuth callback so post-auth redirect honors deep links
+    const callbackUrl = new URL(`${location.origin}/auth/callback`)
+    if (next) callbackUrl.searchParams.set("next", next)
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${location.origin}/auth/callback` },
+      options: { redirectTo: callbackUrl.toString() },
     })
   }
 
@@ -89,7 +105,9 @@ export default function SignInPage() {
       // Non-fatal
     }
 
-    router.push("/")
+    // Honor deep-link destination (e.g. /account from trial email) if present.
+    // Middleware on the destination still enforces any required gates.
+    router.push(next ?? "/")
   }
 
   // ── Render ────────────────────────────────────────────────────────────────

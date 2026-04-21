@@ -9,6 +9,7 @@ interface CurrentUser {
   plan: PlanId | null
   trialEndsAt: string | null
   paymentFailed: boolean
+  onboardingComplete: boolean
   onboardingVoice: string | null
   onboardingIntent: string | null
   lastVoice: string | null
@@ -27,6 +28,7 @@ export function useCurrentUser(): CurrentUser {
     plan: null,
     trialEndsAt: null,
     paymentFailed: false,
+    onboardingComplete: false,
     onboardingVoice: null,
     onboardingIntent: null,
     lastVoice: null,
@@ -40,7 +42,7 @@ export function useCurrentUser(): CurrentUser {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        setState({ userId: null, plan: null, trialEndsAt: null, paymentFailed: false, onboardingVoice: null, onboardingIntent: null, lastVoice: null, lastIntent: null, isLoaded: true })
+        setState({ userId: null, plan: null, trialEndsAt: null, paymentFailed: false, onboardingComplete: false, onboardingVoice: null, onboardingIntent: null, lastVoice: null, lastIntent: null, isLoaded: true })
         return
       }
       const meta = user.app_metadata ?? {}
@@ -49,6 +51,7 @@ export function useCurrentUser(): CurrentUser {
         plan: (meta.plan_tier as PlanId) ?? null,
         trialEndsAt: (meta.trial_ends_at as string) ?? null,
         paymentFailed: (meta.payment_failed as boolean) ?? false,
+        onboardingComplete: meta.onboarding_complete === true,
         onboardingVoice: (meta.onboarding_voice as string) ?? null,
         onboardingIntent: (meta.onboarding_intent as string) ?? null,
         lastVoice: (meta.last_voice as string) ?? null,

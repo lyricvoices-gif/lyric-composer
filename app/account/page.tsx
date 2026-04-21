@@ -17,6 +17,7 @@ export default function AccountPage() {
   const router = useRouter()
   const [plan, setPlan] = useState<PlanId | null>(null)
   const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null)
+  const [onboardingComplete, setOnboardingComplete] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [cancelling, setCancelling] = useState(false)
@@ -35,6 +36,7 @@ export default function AccountPage() {
       const meta = user.app_metadata ?? {}
       setPlan((meta.plan_tier as PlanId) ?? null)
       setTrialEndsAt((meta.trial_ends_at as string) ?? null)
+      setOnboardingComplete(meta.onboarding_complete === true)
       setLoaded(true)
     })
   }, [router])
@@ -129,7 +131,7 @@ export default function AccountPage() {
           </a>
           {!cancelled && (
             <a
-              href="/"
+              href={onboardingComplete ? "/" : "/onboarding"}
               className="acct-back"
               style={{
                 padding: "8px 18px",
@@ -142,7 +144,7 @@ export default function AccountPage() {
                 letterSpacing: "-0.01em",
               }}
             >
-              Back to composer
+              {onboardingComplete ? "Back to composer" : "Finish setup"}
             </a>
           )}
         </header>

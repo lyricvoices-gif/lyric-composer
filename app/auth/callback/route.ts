@@ -11,9 +11,23 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { neon } from "@neondatabase/serverless"
 
+/**
+ * Validates a `next` query param as a safe same-origin path. Guards against
+ * open-redirect via //evil.com or absolute URLs and against loops back to
+ * /sign-in or /auth. Returns null if unsafe or missing.
+ */
+function safeNext(raw: string | null): string | null {
+  if (!raw) return null
+  // Must start with a single "/" (relative path), not "//" (protocol-relative)
+  if (!raw.startsWith("/") || raw.startsWith("//")) return null
+  if (raw.startsWith("/sign-in") || raw.startsWith("/auth")) return null
+  return raw
+}
+
 export async function GET(request: Request): Promise<Response> {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get("code")
+  const next = safeNext(searchParams.get("next"))
 
   if (!code) {
     return NextResponse.redirect(`${origin}/sign-in?error=missing_code`)
@@ -62,6 +76,13 @@ export async function GET(request: Request): Promise<Response> {
 
   if (!hasPlan && !hasTrial) {
     return NextResponse.redirect(`${origin}/upgrade`)
+  }
+
+  // If the user was deep-linked somewhere specific (e.g. /account from a trial
+  // email), honor that destination. The middleware gate on the destination
+  // still enforces onboarding for paths that require it.
+  if (next) {
+    return NextResponse.redirect(`${origin}${next}`)
   }
 
   const destination = meta.onboarding_complete ? "/" : "/onboarding"
