@@ -10,7 +10,7 @@ import { Plus, Download, RotateCcw } from "lucide-react"
 import { trackGeneration, trackDownload, trackPreview } from "@/lib/analytics"
 import Wordmark from "@/components/Wordmark"
 
-const MARKETING_URL = "https://lyric-marketing.vercel.app"
+const MARKETING_URL = "https://www.lyricvoices.ai"
 
 // Inline direction marks are derived per-voice from palette.emotionGroups
 
