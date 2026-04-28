@@ -1,25 +1,26 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import Wordmark from "@/components/Wordmark"
+import { getVoice } from "@/lib/voiceData"
 import { DARK, LIGHT, GOLD, italic, display, SIGNUP_HREF, SIGNIN_HREF } from "./tokens"
 import { track } from "./track"
 
-export default function Hero() {
-  const videoRef = useRef<HTMLVideoElement>(null)
+// Inline sample for the hero secondary CTA. Morgan is the flagship voice
+// and the only voice that ships with a real R2-hosted sample today.
+const HERO_SAMPLE = getVoice("morgan-anchor")
 
-  // Pause the hero video when the tab is hidden — saves CPU on mobile,
-  // and prevents Safari autoplay re-triggers when the user comes back.
+export default function Hero() {
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [playing, setPlaying] = useState(false)
+
   useEffect(() => {
-    const v = videoRef.current
-    if (!v) return
-    function onVisibility() {
-      if (!v) return
-      if (document.hidden) v.pause()
-      else v.play().catch(() => {})
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
     }
-    document.addEventListener("visibilitychange", onVisibility)
-    return () => document.removeEventListener("visibilitychange", onVisibility)
   }, [])
 
   function onPrimary() {
@@ -27,8 +28,32 @@ export default function Hero() {
     track("landing_signup_start", { source: "hero" })
   }
 
-  function onSecondary() {
-    track("landing_cta_click", { cta: "hero_secondary", target: "signin" })
+  function onSignIn() {
+    track("landing_cta_click", { cta: "hero_signin", target: "signin" })
+  }
+
+  function onSamplePlay() {
+    if (!audioRef.current) {
+      const a = new Audio(HERO_SAMPLE.sampleUrl)
+      a.preload = "auto"
+      a.onended = () => setPlaying(false)
+      a.onpause = () => setPlaying(false)
+      a.onplay = () => setPlaying(true)
+      audioRef.current = a
+    }
+    if (playing) {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
+      setPlaying(false)
+      return
+    }
+    audioRef.current
+      .play()
+      .then(() => {
+        track("landing_audio_play", { source: "hero", voiceId: HERO_SAMPLE.id })
+        track("landing_cta_click", { cta: "hero_sample", target: "audio" })
+      })
+      .catch(() => setPlaying(false))
   }
 
   return (
@@ -41,180 +66,195 @@ export default function Hero() {
         isolation: "isolate",
       }}
     >
-      {/* Looping sizzle reel — muted, autoplay, loop, playsinline */}
-      <video
-        ref={videoRef}
-        src="/landing/videos/sizzle.mp4"
-        autoPlay
-        muted
-        loop
-        playsInline
-        preload="metadata"
-        aria-hidden="true"
-        style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          opacity: 0.28,
-          filter: "blur(6px) saturate(0.85)",
-          transform: "scale(1.08)", // hide blur edges
-          zIndex: 0,
-        }}
-      />
-
-      {/* Dark + gold gradient wash over the video for legibility */}
+      {/* Soft gold radial accent for depth — no video; the editorial weight
+          of the typography carries the hero on its own. */}
       <div
         aria-hidden="true"
         style={{
           position: "absolute",
           inset: 0,
-          zIndex: 1,
+          zIndex: 0,
           background:
-            "linear-gradient(180deg, rgba(43,42,37,0.78) 0%, rgba(43,42,37,0.82) 40%, rgba(43,42,37,0.95) 100%)",
+            "radial-gradient(ellipse 60% 50% at 25% 35%, rgba(201,169,110,0.08) 0%, rgba(43,42,37,0) 60%), radial-gradient(ellipse 40% 60% at 80% 70%, rgba(201,169,110,0.05) 0%, rgba(43,42,37,0) 60%)",
         }}
       />
 
-      {/* Top bar: wordmark + sign-in (no nav clutter) */}
-      <header
-        style={{
-          position: "relative",
-          zIndex: 2,
-          padding: "24px 32px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <a href="/" aria-label="Lyric" style={{ color: LIGHT, display: "flex", alignItems: "center" }}>
-          <Wordmark height={36} color={LIGHT} />
-        </a>
-        <a
-          href={SIGNIN_HREF}
-          onClick={onSecondary}
-          style={{
-            color: "rgba(245,243,239,0.78)",
-            fontSize: "13px",
-            letterSpacing: "0.01em",
-            textDecoration: "none",
-            padding: "8px 14px",
-            borderRadius: "100px",
-            border: "1px solid rgba(245,243,239,0.14)",
-            background: "rgba(245,243,239,0.04)",
-          }}
-        >
-          Sign in
-        </a>
-      </header>
-
-      {/* Main hero content */}
+      {/* Single 1120px container holds both header and main content so they
+          share a left edge — fixes the visual disconnect at viewports >1120px
+          where a header at viewport-padding drifts left of centered content. */}
       <div
         style={{
           position: "relative",
           zIndex: 2,
           maxWidth: "1120px",
           margin: "0 auto",
-          padding: "clamp(48px, 8vh, 96px) 32px clamp(64px, 12vh, 120px)",
+          padding: "24px 48px 64px",
+          minHeight: "100svh",
           display: "flex",
           flexDirection: "column",
-          gap: "32px",
+          boxSizing: "border-box",
         }}
       >
-        <p
+        <header
           style={{
-            fontSize: "11px",
-            fontWeight: 600,
-            letterSpacing: "0.14em",
-            textTransform: "uppercase",
-            color: "rgba(245,243,239,0.55)",
-            margin: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
           }}
         >
-          Lyric Composer · Edition 01
-        </p>
-
-        <h1
-          style={{
-            ...display,
-            fontSize: "clamp(40px, 7vw, 88px)",
-            fontWeight: 500,
-            color: LIGHT,
-            margin: 0,
-            lineHeight: 0.95,
-            letterSpacing: "-0.02em",
-            maxWidth: "18ch",
-          }}
-        >
-          Voice artists build the voices.{" "}
-          <span style={{ ...italic, color: GOLD, fontWeight: 400 }}>You compose with them.</span>
-        </h1>
-
-        <p
-          style={{
-            fontSize: "clamp(16px, 1.6vw, 19px)",
-            lineHeight: 1.55,
-            color: "rgba(245,243,239,0.7)",
-            maxWidth: "520px",
-            margin: 0,
-          }}
-        >
-          Direct five voice artists with intent, emotion, and pacing. Generate broadcast-ready audio in seconds. Composed, not cloned.
-        </p>
-
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center", marginTop: "8px" }}>
-          <a
-            href={SIGNUP_HREF}
-            onClick={onPrimary}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "14px 28px",
-              borderRadius: "100px",
-              fontSize: "15px",
-              fontWeight: 500,
-              background: LIGHT,
-              color: DARK,
-              letterSpacing: "-0.01em",
-              textDecoration: "none",
-            }}
-          >
-            Start your free trial
-            <span aria-hidden="true" style={{ fontSize: "13px" }}>→</span>
+          <a href="/" aria-label="Lyric" style={{ color: LIGHT, display: "flex", alignItems: "center" }}>
+            <Wordmark height={36} color={LIGHT} />
           </a>
           <a
-            href="#voices"
-            onClick={() => track("landing_cta_click", { cta: "hero_listen", target: "voices" })}
+            href={SIGNIN_HREF}
+            onClick={onSignIn}
             style={{
-              display: "inline-flex",
-              alignItems: "center",
-              padding: "14px 24px",
+              color: "rgba(245,243,239,0.78)",
+              fontSize: "13px",
+              letterSpacing: "0.01em",
+              textDecoration: "none",
+              padding: "8px 14px",
               borderRadius: "100px",
-              fontSize: "15px",
-              fontWeight: 400,
+              border: "1px solid rgba(245,243,239,0.14)",
               background: "rgba(245,243,239,0.04)",
-              color: "rgba(245,243,239,0.85)",
-              border: "1px solid rgba(245,243,239,0.18)",
-              letterSpacing: "-0.01em",
-              textDecoration: "none",
             }}
           >
-            Hear the voices
+            Sign in
           </a>
-        </div>
+        </header>
 
-        <p
+        {/* Vertically-centered hero content. flex:1 + justifyContent:center
+            anchors the headline near the optical middle of the viewport
+            without depending on a magic top-padding number. */}
+        <div
           style={{
-            fontSize: "12px",
-            letterSpacing: "0.02em",
-            color: "rgba(245,243,239,0.42)",
-            margin: 0,
-            marginTop: "4px",
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            gap: "32px",
+            paddingTop: "clamp(48px, 6vh, 72px)",
+            paddingBottom: "clamp(64px, 8vh, 96px)",
           }}
         >
-          7-day free trial. Credit card required. Cancel anytime.
-        </p>
+          <p
+            style={{
+              fontSize: "11px",
+              fontWeight: 600,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: "rgba(245,243,239,0.55)",
+              margin: 0,
+            }}
+          >
+            Lyric Composer · Edition 01
+          </p>
+
+          <h1
+            style={{
+              ...display,
+              fontSize: "clamp(36px, 5.2vw, 64px)",
+              fontWeight: 500,
+              color: LIGHT,
+              margin: 0,
+              lineHeight: 1.02,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            Studio-quality voiceover in 30 seconds.
+            <br />
+            <span style={{ ...italic, color: GOLD, fontWeight: 400 }}>Composed, not cloned.</span>
+          </h1>
+
+          <p
+            style={{
+              fontSize: "clamp(16px, 1.6vw, 19px)",
+              lineHeight: 1.55,
+              color: "rgba(245,243,239,0.72)",
+              maxWidth: "620px",
+              margin: 0,
+            }}
+          >
+            For brands, agencies, and creators who need broadcast-ready audio without the booking, the budget, or the ethical baggage of voice cloning. Direct five real voice artists with intent, emotion, and pacing.
+          </p>
+
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center", marginTop: "8px" }}>
+            <a
+              href={SIGNUP_HREF}
+              onClick={onPrimary}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "14px 28px",
+                borderRadius: "100px",
+                fontSize: "15px",
+                fontWeight: 500,
+                background: LIGHT,
+                color: DARK,
+                letterSpacing: "-0.01em",
+                textDecoration: "none",
+              }}
+            >
+              Start your free trial
+              <span aria-hidden="true" style={{ fontSize: "13px" }}>→</span>
+            </a>
+            <button
+              type="button"
+              onClick={onSamplePlay}
+              aria-label={playing ? "Pause sample" : "Play a sample"}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "10px",
+                padding: "14px 22px 14px 18px",
+                borderRadius: "100px",
+                fontSize: "15px",
+                fontWeight: 400,
+                background: playing ? "rgba(245,243,239,0.10)" : "rgba(245,243,239,0.04)",
+                color: "rgba(245,243,239,0.9)",
+                border: "1px solid rgba(245,243,239,0.18)",
+                letterSpacing: "-0.01em",
+                cursor: "pointer",
+                fontFamily: "inherit",
+                transition: "background 0.15s",
+              }}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  width: "22px",
+                  height: "22px",
+                  borderRadius: "100px",
+                  background: GOLD,
+                  color: DARK,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "9px",
+                  flexShrink: 0,
+                }}
+              >
+                {playing ? "❚❚" : "▶"}
+              </span>
+              {playing ? "Pause sample" : "Play a sample"}
+            </button>
+          </div>
+
+          <p
+            style={{
+              fontSize: "12px",
+              lineHeight: 1.6,
+              letterSpacing: "0.01em",
+              color: "rgba(245,243,239,0.45)",
+              margin: 0,
+              marginTop: "4px",
+              maxWidth: "520px",
+            }}
+          >
+            7-day free trial. Credit card required. Cancel anytime. Full commercial rights on Creator and Studio plans.
+          </p>
+        </div>
       </div>
 
       {/* Subtle scroll cue */}
