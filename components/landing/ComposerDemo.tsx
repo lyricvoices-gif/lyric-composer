@@ -2,47 +2,51 @@
 
 import { useEffect, useRef, useState } from "react"
 import ScrollReveal from "./ScrollReveal"
-import { LIGHT, TEXT1, TEXT2, TEXT3, GOLD, display, italic, label } from "./tokens"
+import { LIGHT, DARK, TEXT1, TEXT2, GOLD, display, italic, label, SIGNUP_HREF } from "./tokens"
 import { track } from "./track"
 
-interface DemoStep {
+interface VideoSlide {
   src: string
-  eyebrow: string
-  title: string
-  body: string
+  caption: string
+  alt: string
 }
 
-const steps: DemoStep[] = [
+// Order matches the workflow: cast → compose → direct → hear.
+// Captions are italic film-subtitle / museum-placard style — one sentence,
+// no terminal punctuation. The video's own motion has to do the explaining.
+const SLIDES: VideoSlide[] = [
   {
     src: "/landing/videos/voice-selection.mp4",
-    eyebrow: "Step 01",
-    title: "Choose a voice",
-    body: "Pick from five voices, each performed by a real artist with their own emotional range.",
+    caption: "Five real voice artists, ready when you are",
+    alt: "Selecting a voice in the Lyric composer",
   },
   {
     src: "/landing/videos/script.mp4",
-    eyebrow: "Step 02",
-    title: "Write the script",
-    body: "Type or paste your copy. The composer treats your script as a performance, not a transcript.",
+    caption: "Your script becomes the canvas",
+    alt: "Writing a script in the Lyric composer",
   },
   {
     src: "/landing/videos/emotional-tag.mp4",
-    eyebrow: "Step 03",
-    title: "Direct with emotion marks",
-    body: "Tag a phrase as confident, intimate, suspenseful. Direction is built into the format.",
+    caption: "Direction lives inside the words",
+    alt: "Tagging a phrase with an emotion mark",
   },
   {
     src: "/landing/videos/generation.mp4",
-    eyebrow: "Step 04",
-    title: "Generate, listen, refine",
-    body: "Hear the take. Adjust direction. Render again. Download MP3 when it sounds right.",
+    caption: "Broadcast-ready audio in seconds",
+    alt: "Generating audio from a directed script",
   },
 ]
 
-function LazyVideo({ src, alt }: { src: string; alt: string }) {
+interface LazyVideoProps {
+  src: string
+  alt: string
+  position: number
+}
+
+function LazyVideo({ src, alt, position }: LazyVideoProps) {
   const ref = useRef<HTMLVideoElement>(null)
   const [loaded, setLoaded] = useState(false)
-  const [played, setPlayed] = useState(false)
+  const playFiredRef = useRef(false)
 
   useEffect(() => {
     const el = ref.current
@@ -56,9 +60,9 @@ function LazyVideo({ src, alt }: { src: string; alt: string }) {
             setLoaded(true)
           }
           el.play().catch(() => {})
-          if (!played) {
-            setPlayed(true)
-            track("landing_video_play", { src })
+          if (!playFiredRef.current) {
+            playFiredRef.current = true
+            track("video_played", { video_position: position })
           }
         } else {
           el.pause()
@@ -68,7 +72,7 @@ function LazyVideo({ src, alt }: { src: string; alt: string }) {
     )
     observer.observe(el)
     return () => observer.disconnect()
-  }, [src, loaded, played])
+  }, [src, loaded, position])
 
   return (
     <video
@@ -78,20 +82,53 @@ function LazyVideo({ src, alt }: { src: string; alt: string }) {
       playsInline
       preload="none"
       aria-label={alt}
+      onEnded={() => track("video_completed", { video_position: position })}
       style={{
         width: "100%",
         display: "block",
         background: "#1a1a18",
         aspectRatio: "16 / 10",
         objectFit: "cover",
+        borderRadius: "4px", // a hair of softness so edges don't feel pasted onto the cream
       }}
     />
   )
 }
 
 export default function ComposerDemo() {
+  const sectionRef = useRef<HTMLDivElement>(null)
+  const viewedRef = useRef(false)
+
+  // what_youll_make_viewed: explicit named event for the analytics dashboard.
+  // SectionTracker still fires the generic landing_section_visible above this
+  // component; both can co-exist.
+  useEffect(() => {
+    const el = sectionRef.current
+    if (!el || viewedRef.current) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !viewedRef.current) {
+          viewedRef.current = true
+          track("what_youll_make_viewed")
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.25 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  function onCtaClick() {
+    track("what_youll_make_cta_clicked")
+    track("landing_signup_start", { source: "what_youll_make" })
+  }
+
   return (
-    <div style={{ background: LIGHT, padding: "clamp(72px, 10vh, 112px) 24px" }}>
+    <div
+      ref={sectionRef}
+      style={{ background: LIGHT, padding: "clamp(72px, 10vh, 112px) 24px" }}
+    >
       <div style={{ maxWidth: "1120px", margin: "0 auto" }}>
         <ScrollReveal>
           <p style={{ ...label, marginBottom: "20px" }}>What you&apos;ll make</p>
@@ -125,63 +162,98 @@ export default function ComposerDemo() {
               margin: "0 0 64px",
             }}
           >
-            Most AI voice tools give you a slider. Lyric gives you a script you can direct, sentence by sentence. This is what that looks like.
+            Most AI voice tools give you a slider. Lyric gives you a script you can direct, sentence by sentence. Watch what that looks like.
           </p>
         </ScrollReveal>
 
+        {/* 2x2 grid. minmax forces 2 columns down to ~840px viewport, then
+            collapses to 1 column on smaller screens. No card chrome — the
+            video carries the moment with a single italic caption beneath. */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: "24px",
+            gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))",
+            gap: "clamp(32px, 4vw, 48px)",
+            alignItems: "start",
           }}
         >
-          {steps.map((s, i) => (
-            <ScrollReveal key={s.src} delay={i * 80}>
+          {SLIDES.map((slide, i) => (
+            <ScrollReveal key={slide.src} delay={i * 80}>
               <figure
                 style={{
                   margin: 0,
-                  background: "#ffffff",
-                  borderRadius: "16px",
-                  overflow: "hidden",
-                  border: "1px solid rgba(28,25,23,0.06)",
-                  height: "100%",
                   display: "flex",
                   flexDirection: "column",
+                  gap: "24px",
                 }}
               >
-                <LazyVideo src={s.src} alt={`${s.title} — composer demonstration`} />
-                <figcaption style={{ padding: "20px 22px 22px" }}>
-                  <p
-                    style={{
-                      fontSize: "10px",
-                      fontWeight: 600,
-                      letterSpacing: "0.14em",
-                      textTransform: "uppercase",
-                      color: TEXT3,
-                      margin: "0 0 8px",
-                    }}
-                  >
-                    {s.eyebrow}
-                  </p>
-                  <h3
-                    style={{
-                      ...display,
-                      fontSize: "22px",
-                      fontWeight: 500,
-                      color: TEXT1,
-                      margin: "0 0 8px",
-                      letterSpacing: "-0.01em",
-                    }}
-                  >
-                    {s.title}
-                  </h3>
-                  <p style={{ fontSize: "13px", color: TEXT2, lineHeight: 1.55, margin: 0 }}>{s.body}</p>
+                <LazyVideo src={slide.src} alt={slide.alt} position={i + 1} />
+                <figcaption
+                  style={{
+                    ...display,
+                    fontStyle: "italic",
+                    fontSize: "clamp(16px, 1.5vw, 19px)",
+                    color: "rgba(43,42,37,0.8)",
+                    textAlign: "center",
+                    lineHeight: 1.4,
+                    letterSpacing: "0.005em",
+                    margin: 0,
+                  }}
+                >
+                  {slide.caption}
                 </figcaption>
               </figure>
             </ScrollReveal>
           ))}
         </div>
+
+        {/* Closing CTA. Sits at peak intent — visitor has just watched the
+            workflow play out, the next click should be free trial. */}
+        <ScrollReveal delay={400}>
+          <div
+            style={{
+              marginTop: "clamp(72px, 10vh, 96px)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "12px",
+            }}
+          >
+            <a
+              href={SIGNUP_HREF}
+              onClick={onCtaClick}
+              className="btn-section-primary"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "14px 28px",
+                borderRadius: "100px",
+                fontSize: "15px",
+                fontWeight: 500,
+                background: DARK,
+                color: LIGHT,
+                letterSpacing: "-0.01em",
+                textDecoration: "none",
+              }}
+            >
+              Start your free trial
+              <span aria-hidden="true" style={{ fontSize: "13px" }}>→</span>
+            </a>
+            <p
+              style={{
+                ...display,
+                fontSize: "14px",
+                color: "rgba(43,42,37,0.6)",
+                margin: 0,
+                letterSpacing: "0.005em",
+                textAlign: "center",
+              }}
+            >
+              7-day free trial. Credit card required. Cancel anytime.
+            </p>
+          </div>
+        </ScrollReveal>
       </div>
     </div>
   )

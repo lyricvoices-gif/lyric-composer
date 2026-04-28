@@ -18,6 +18,10 @@ export type LandingEvent =
   | "voice_completed"
   | "waveform_seek"
   | "transcript_opened"
+  | "what_youll_make_viewed"
+  | "video_played"
+  | "video_completed"
+  | "what_youll_make_cta_clicked"
 
 export function track(event: LandingEvent, metadata?: Record<string, unknown>): void {
   try {

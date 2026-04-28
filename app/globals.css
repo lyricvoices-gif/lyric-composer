@@ -63,6 +63,23 @@ html {
     background: rgba(245, 243, 239, 0.08);
     border-color: rgba(245, 243, 239, 0.28);
   }
+
+  /* Dark pill on a light section (e.g. demo CTA, pricing CTA). Mirrors the
+     hero-primary lift + soft shadow but warms the background a touch on
+     hover instead of brightening to white. */
+  .btn-section-primary {
+    transition: background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  }
+  .btn-section-primary:hover {
+    background: #1a1a18;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px -8px rgba(0, 0, 0, 0.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-section-primary { transition: none; }
+  .btn-section-primary:hover { transform: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
