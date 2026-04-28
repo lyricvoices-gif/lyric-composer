@@ -76,6 +76,114 @@ html {
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+   Voice section — The Stack
+───────────────────────────────────────────────────────────────────── */
+@layer components {
+  .stack-row {
+    transition: transform 0.2s ease;
+  }
+  .stack-row:hover {
+    transform: translateY(-2px);
+  }
+  .stack-row:focus-visible {
+    outline: 2px solid #c9a96e;
+    outline-offset: 4px;
+    border-radius: 6px;
+  }
+
+  /* Play disc — gold ring fades in on row hover, solid at 50% when active. */
+  .stack-play::before {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border-radius: 100px;
+    border: 1.5px solid rgba(201, 169, 110, 0);
+    transition: border-color 0.25s ease;
+    pointer-events: none;
+  }
+  .stack-row:hover .stack-play::before {
+    border-color: rgba(201, 169, 110, 0.3);
+  }
+  .stack-play[data-active="true"]::before {
+    border-color: rgba(201, 169, 110, 0.5);
+  }
+}
+
+/* Mobile layout: re-flow the row into a 2-row stacked layout. The voice
+   name sits above its inline italic use case; the swatch runs the full row
+   on the left and the play disc anchors center-right. Edition number drops
+   on small viewports — the row is doing more work per pixel and the number
+   adds noise without much signal. */
+@media (max-width: 720px) {
+  .stack-row {
+    grid-template-columns: 4px 1fr auto !important;
+    grid-template-rows: auto auto !important;
+    grid-template-areas:
+      "swatch name    play"
+      "swatch usecase play" !important;
+    column-gap: 16px !important;
+    row-gap: 4px !important;
+    min-height: 96px !important;
+    padding: 18px 0 !important;
+    align-items: start !important;
+  }
+  .stack-row .stack-swatch { grid-area: swatch; height: 100% !important; width: 4px !important; align-self: stretch; }
+  .stack-row .stack-name { grid-area: name; align-self: center; }
+  .stack-row .stack-usecase-inline {
+    grid-area: usecase;
+    align-self: center;
+    font-size: 14px !important;
+    opacity: 0.7;
+  }
+  .stack-row .stack-usecase-inline > span:first-child { display: none; } /* drop the inline middle dot on mobile */
+  .stack-row .stack-edition { display: none !important; }
+  .stack-row .stack-play { grid-area: play; align-self: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stack-row { transition: none; }
+  .stack-row:hover { transform: none; }
+  .stack-play::before { transition: none; }
+}
+
+/* Waveform bars. Two-tone (full opacity ahead of playhead, 40% behind) plus
+   an organic breathing animation on unplayed bars while the row is playing.
+   When the row pauses, .is-playing is removed and the opacity transition
+   smooths each bar back to its static rest value within ~400ms.
+
+   Wrapped in @layer components so Tailwind 4 keeps these rules instead of
+   tree-shaking them as unused utility classes. */
+@layer components {
+  .stack-bar {
+    transition: opacity 0.4s ease-out, height 0.2s ease-out;
+  }
+  .stack-bar.is-played {
+    opacity: 0.4;
+  }
+  .stack-bar.is-unplayed {
+    opacity: 1;
+  }
+  .stack-waveform.is-playing .stack-bar.is-unplayed {
+    animation: stack-bar-breathe var(--bar-duration, 2000ms) ease-in-out infinite;
+    animation-delay: var(--bar-delay, 0ms);
+  }
+}
+
+@keyframes stack-bar-breathe {
+  0%, 100% { opacity: 0.78; }
+  50%      { opacity: 1; }
+}
+
+/* Reduced-motion: disable the breathe entirely. Played/unplayed split still
+   updates as audio plays — only the per-bar shimmer is gone. */
+@media (prefers-reduced-motion: reduce) {
+  .stack-waveform.is-playing .stack-bar.is-unplayed {
+    animation: none;
+  }
+  .stack-bar { transition: none; }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

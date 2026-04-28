@@ -16,6 +16,12 @@ const ALLOWED_EVENTS: UserEventType[] = [
   "landing_video_play",
   "landing_cta_click",
   "landing_signup_start",
+  "voices_section_viewed",
+  "voice_played",
+  "voice_switched",
+  "voice_completed",
+  "waveform_seek",
+  "transcript_opened",
 ]
 
 export async function POST(req: NextRequest) {
