@@ -3,7 +3,10 @@ import { NextResponse, type NextRequest } from "next/server"
 import { isTrialActive, hasPaidPlan } from "@/lib/planConfig"
 
 // Paths that never require auth
+// Note: "/" is the public landing page. The page itself reads the Supabase
+// session and redirects logged-in users to /composer (where the gates below apply).
 const PUBLIC_PREFIXES = ["/sign-in", "/sign-up", "/auth/callback", "/api/"]
+const PUBLIC_EXACT = new Set<string>(["/"])
 
 // Paths that require auth but skip the payment/onboarding gates
 const AUTH_GATED_PREFIXES = ["/upgrade", "/onboarding", "/account"]
@@ -38,6 +41,11 @@ export async function middleware(request: NextRequest) {
 
   // Always allow public paths and API routes
   if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) {
+    return supabaseResponse
+  }
+
+  // Public landing page handles its own auth-aware routing
+  if (PUBLIC_EXACT.has(path)) {
     return supabaseResponse
   }
 
@@ -80,7 +88,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest|mp4|webm|mov|m4a|mp3|wav|ogg|avif)).*)",
     "/(api|trpc)(.*)",
   ],
 }

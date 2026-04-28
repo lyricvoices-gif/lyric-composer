@@ -15,6 +15,12 @@ export type UserEventType =
   | "generation_error"
   | "payment_failed"
   | "subscription_cancelled"
+  | "landing_page_view"
+  | "landing_section_visible"
+  | "landing_audio_play"
+  | "landing_video_play"
+  | "landing_cta_click"
+  | "landing_signup_start"
 
 export interface UserEventInput {
   userId: string | null
