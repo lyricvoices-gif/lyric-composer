@@ -37,6 +37,45 @@ html {
   }
 }
 
+/* Hero CTA hover states. Wrapped in @layer components so Tailwind 4 keeps
+   the rules — bare class selectors get filtered without the layer wrapper.
+   Inline styles in Hero.tsx set the base color; these only express the
+   hover delta. */
+@layer components {
+  .btn-hero-primary,
+  .btn-hero-secondary,
+  .btn-hero-signin {
+    transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .btn-hero-primary:hover {
+    background: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px -8px rgba(0, 0, 0, 0.4);
+  }
+
+  .btn-hero-secondary:hover {
+    background: rgba(245, 243, 239, 0.10);
+    border-color: rgba(245, 243, 239, 0.32);
+  }
+
+  .btn-hero-signin:hover {
+    background: rgba(245, 243, 239, 0.08);
+    border-color: rgba(245, 243, 239, 0.28);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-hero-primary,
+  .btn-hero-secondary,
+  .btn-hero-signin {
+    transition: none;
+  }
+  .btn-hero-primary:hover {
+    transform: none;
+  }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

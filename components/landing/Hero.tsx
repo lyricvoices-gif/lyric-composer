@@ -5,6 +5,7 @@ import Wordmark from "@/components/Wordmark"
 import { getVoice } from "@/lib/voiceData"
 import { DARK, LIGHT, GOLD, italic, display, SIGNUP_HREF, SIGNIN_HREF } from "./tokens"
 import { track } from "./track"
+import ScrollReveal from "./ScrollReveal"
 
 // Inline sample for the hero secondary CTA. Morgan is the flagship voice
 // and the only voice that ships with a real R2-hosted sample today.
@@ -79,15 +80,16 @@ export default function Hero() {
         }}
       />
 
-      {/* Single 1120px container holds both header and main content so they
-          share a left edge — fixes the visual disconnect at viewports >1120px
-          where a header at viewport-padding drifts left of centered content. */}
+      {/* Full-width hero container with section-level padding only — mirrors
+          the marketing home hero (alignItems: flex-start, padding: 48px sides,
+          no inner maxWidth wrapper). Wordmark + content share a left edge at
+          48px from the viewport on every breakpoint. Per-element maxWidths
+          below keep the headline + subhead from sprawling on ultrawide
+          displays. */}
       <div
         style={{
           position: "relative",
           zIndex: 2,
-          maxWidth: "1120px",
-          margin: "0 auto",
           padding: "24px 48px 64px",
           minHeight: "100svh",
           display: "flex",
@@ -108,6 +110,7 @@ export default function Hero() {
           <a
             href={SIGNIN_HREF}
             onClick={onSignIn}
+            className="btn-hero-signin"
             style={{
               color: "rgba(245,243,239,0.78)",
               fontSize: "13px",
@@ -137,51 +140,60 @@ export default function Hero() {
             paddingBottom: "clamp(64px, 8vh, 96px)",
           }}
         >
-          <p
-            style={{
-              fontSize: "11px",
-              fontWeight: 600,
-              letterSpacing: "0.14em",
-              textTransform: "uppercase",
-              color: "rgba(245,243,239,0.55)",
-              margin: 0,
-            }}
-          >
-            Lyric Composer · Edition 01
-          </p>
+          <ScrollReveal delay={0}>
+            <p
+              style={{
+                fontSize: "11px",
+                fontWeight: 600,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                color: "rgba(245,243,239,0.55)",
+                margin: 0,
+              }}
+            >
+              Lyric Composer · Edition 01
+            </p>
+          </ScrollReveal>
 
-          <h1
-            style={{
-              ...display,
-              fontSize: "clamp(36px, 5.2vw, 64px)",
-              fontWeight: 500,
-              color: LIGHT,
-              margin: 0,
-              lineHeight: 1.02,
-              letterSpacing: "-0.02em",
-            }}
-          >
-            Studio-quality voiceover in 30 seconds.
-            <br />
-            <span style={{ ...italic, color: GOLD, fontWeight: 400 }}>Composed, not cloned.</span>
-          </h1>
+          <ScrollReveal delay={80}>
+            <h1
+              style={{
+                ...display,
+                fontSize: "clamp(36px, 5.2vw, 64px)",
+                fontWeight: 500,
+                color: LIGHT,
+                margin: 0,
+                lineHeight: 1.02,
+                letterSpacing: "-0.02em",
+                maxWidth: "1100px",
+              }}
+            >
+              Studio-quality voiceover in 30 seconds.
+              <br />
+              <span style={{ ...italic, color: GOLD, fontWeight: 400 }}>Composed, not cloned.</span>
+            </h1>
+          </ScrollReveal>
 
-          <p
-            style={{
-              fontSize: "clamp(16px, 1.6vw, 19px)",
-              lineHeight: 1.55,
-              color: "rgba(245,243,239,0.72)",
-              maxWidth: "620px",
-              margin: 0,
-            }}
-          >
-            For brands, agencies, and creators who need broadcast-ready audio without the booking, the budget, or the ethical baggage of voice cloning. Direct five real voice artists with intent, emotion, and pacing.
-          </p>
+          <ScrollReveal delay={160}>
+            <p
+              style={{
+                fontSize: "clamp(16px, 1.6vw, 19px)",
+                lineHeight: 1.55,
+                color: "rgba(245,243,239,0.72)",
+                maxWidth: "620px",
+                margin: 0,
+              }}
+            >
+              For brands, agencies, and creators who need broadcast-ready audio without the booking, the budget, or the ethical baggage of voice cloning. Direct five real voice artists with intent, emotion, and pacing.
+            </p>
+          </ScrollReveal>
 
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center", marginTop: "8px" }}>
+          <ScrollReveal delay={240}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center", marginTop: "8px" }}>
             <a
               href={SIGNUP_HREF}
               onClick={onPrimary}
+              className="btn-hero-primary"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -203,6 +215,7 @@ export default function Hero() {
               type="button"
               onClick={onSamplePlay}
               aria-label={playing ? "Pause sample" : "Play a sample"}
+              className="btn-hero-secondary"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -239,21 +252,24 @@ export default function Hero() {
               </span>
               {playing ? "Pause sample" : "Play a sample"}
             </button>
-          </div>
+            </div>
+          </ScrollReveal>
 
-          <p
-            style={{
-              fontSize: "12px",
-              lineHeight: 1.6,
-              letterSpacing: "0.01em",
-              color: "rgba(245,243,239,0.45)",
-              margin: 0,
-              marginTop: "4px",
-              maxWidth: "520px",
-            }}
-          >
-            7-day free trial. Credit card required. Cancel anytime. Full commercial rights on Creator and Studio plans.
-          </p>
+          <ScrollReveal delay={320}>
+            <p
+              style={{
+                fontSize: "12px",
+                lineHeight: 1.6,
+                letterSpacing: "0.01em",
+                color: "rgba(245,243,239,0.45)",
+                margin: 0,
+                marginTop: "4px",
+                maxWidth: "520px",
+              }}
+            >
+              7-day free trial. Credit card required. Cancel anytime. Full commercial rights on Creator and Studio plans.
+            </p>
+          </ScrollReveal>
         </div>
       </div>
 
