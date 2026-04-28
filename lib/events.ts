@@ -31,6 +31,8 @@ export type UserEventType =
   | "video_played"
   | "video_completed"
   | "what_youll_make_cta_clicked"
+  | "wedge_section_viewed"
+  | "wedge_cta_clicked"
 
 export interface UserEventInput {
   userId: string | null

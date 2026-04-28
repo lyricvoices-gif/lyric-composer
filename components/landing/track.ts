@@ -22,6 +22,8 @@ export type LandingEvent =
   | "video_played"
   | "video_completed"
   | "what_youll_make_cta_clicked"
+  | "wedge_section_viewed"
+  | "wedge_cta_clicked"
 
 export function track(event: LandingEvent, metadata?: Record<string, unknown>): void {
   try {
