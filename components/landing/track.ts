@@ -24,6 +24,11 @@ export type LandingEvent =
   | "what_youll_make_cta_clicked"
   | "wedge_section_viewed"
   | "wedge_cta_clicked"
+  | "pricing_section_viewed"
+  | "pricing_card_hovered"
+  | "pricing_cta_clicked"
+  | "annual_toggled"
+  | "pricing_link_clicked"
 
 export function track(event: LandingEvent, metadata?: Record<string, unknown>): void {
   try {

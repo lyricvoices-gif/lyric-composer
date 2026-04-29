@@ -6,11 +6,17 @@
  *   - Trial start:  { planId: "creator", trial: true }  → 7-day free trial, card captured
  *   - Direct sub:   { planId: "studio" }                → immediate charge
  *
+ * Period is monthly by default. Pass period: "annual" to use the yearly
+ * price IDs (set up to be ~20% cheaper than 12× monthly on the landing
+ * page billing toggle).
+ *
  * Required env vars:
- *   STRIPE_SECRET_KEY          — from Stripe dashboard
- *   STRIPE_PRICE_CREATOR       — Stripe price ID for Creator ($29/mo)
- *   STRIPE_PRICE_STUDIO        — Stripe price ID for Studio ($99/mo)
- *   NEXT_PUBLIC_APP_URL        — e.g. https://composer.lyricvoices.ai
+ *   STRIPE_SECRET_KEY                 — from Stripe dashboard
+ *   STRIPE_PRICE_CREATOR              — Stripe price ID for Creator monthly ($29/mo)
+ *   STRIPE_PRICE_STUDIO               — Stripe price ID for Studio monthly ($99/mo)
+ *   STRIPE_PRICE_CREATOR_ANNUAL       — Stripe price ID for Creator annual ($278/yr)
+ *   STRIPE_PRICE_STUDIO_ANNUAL        — Stripe price ID for Studio annual ($950/yr)
+ *   NEXT_PUBLIC_APP_URL               — e.g. https://composer.lyricvoices.ai
  */
 
 import { createClient } from "@/lib/supabase/server"
@@ -20,9 +26,26 @@ import { insertUserEvent } from "@/lib/events"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
-const PRICE_IDS: Record<string, string> = {
-  creator: process.env.STRIPE_PRICE_CREATOR!,
-  studio:  process.env.STRIPE_PRICE_STUDIO!,
+type BillingPeriod = "monthly" | "annual"
+
+// plan + period → Stripe price ID. Annual entries fall back to monthly if
+// the annual env var isn't set, so adding annual prices in Stripe and then
+// shipping the env var change is safe to do in either order.
+const PRICE_IDS: Record<string, Record<BillingPeriod, string | undefined>> = {
+  creator: {
+    monthly: process.env.STRIPE_PRICE_CREATOR,
+    annual:  process.env.STRIPE_PRICE_CREATOR_ANNUAL ?? process.env.STRIPE_PRICE_CREATOR,
+  },
+  studio: {
+    monthly: process.env.STRIPE_PRICE_STUDIO,
+    annual:  process.env.STRIPE_PRICE_STUDIO_ANNUAL ?? process.env.STRIPE_PRICE_STUDIO,
+  },
+}
+
+function resolvePriceId(planId: string, period: BillingPeriod): string | null {
+  const entry = PRICE_IDS[planId]
+  if (!entry) return null
+  return entry[period] ?? entry.monthly ?? null
 }
 
 function db() {
@@ -35,16 +58,20 @@ export async function POST(req: Request): Promise<Response> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 })
 
-  let body: { planId: string; trial?: boolean }
+  let body: { planId: string; trial?: boolean; period?: BillingPeriod }
   try {
     body = await req.json()
   } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400 })
   }
 
-  const priceId = PRICE_IDS[body.planId]
+  const period: BillingPeriod = body.period === "annual" ? "annual" : "monthly"
+  const priceId = resolvePriceId(body.planId, period)
   if (!priceId) {
-    return Response.json({ error: `Unknown planId: "${body.planId}"` }, { status: 400 })
+    return Response.json(
+      { error: `No price configured for plan "${body.planId}" period "${period}"` },
+      { status: 400 }
+    )
   }
 
   const email = user.email ?? (user.user_metadata?.email as string | undefined) ?? ""
@@ -104,6 +131,7 @@ export async function POST(req: Request): Promise<Response> {
     metadata: {
       supabase_user_id: user.id,
       plan_id: body.planId,
+      period,
       is_trial: body.trial ? "true" : "false",
     },
   }
@@ -115,6 +143,7 @@ export async function POST(req: Request): Promise<Response> {
       metadata: {
         supabase_user_id: user.id,
         plan_id: body.planId,
+        period,
       },
     }
   }
@@ -127,6 +156,7 @@ export async function POST(req: Request): Promise<Response> {
     planTier: body.planId,
     metadata: {
       is_trial: !!body.trial,
+      period,
       session_id: session.id,
       price_id: priceId,
     },

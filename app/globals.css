@@ -82,6 +82,82 @@ html {
   .btn-section-primary:hover { transform: none; }
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+   Pricing cards — Studio lift, hover lift on flanking cards, CTA hover
+───────────────────────────────────────────────────────────────────── */
+@layer components {
+  .pricing-card {
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+  }
+  /* Studio sits a hair higher than the flanking cards on desktop. */
+  .pricing-card[data-highlight="true"] {
+    transform: translateY(-6px);
+  }
+  .pricing-card[data-highlight="true"]:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 30px 50px -16px rgba(0, 0, 0, 0.32);
+  }
+  .pricing-card[data-highlight="false"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 28px -16px rgba(0, 0, 0, 0.22);
+  }
+
+  /* CTA button hover treatments. The dark variant warms instead of going
+     darker; the light variant brightens to pure white. */
+  .btn-pricing-dark {
+    transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  }
+  .btn-pricing-dark:hover {
+    background: #1a1a18;
+    box-shadow: 0 4px 14px -8px rgba(0, 0, 0, 0.4);
+  }
+  .btn-pricing-light {
+    transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  }
+  .btn-pricing-light:hover {
+    background: #ffffff;
+    box-shadow: 0 4px 14px -8px rgba(0, 0, 0, 0.4);
+  }
+  .btn-pricing-dark:active,
+  .btn-pricing-light:active {
+    transform: translateY(1px);
+  }
+
+  .pricing-period-btn:focus-visible {
+    outline: 2px solid #c9a96e;
+    outline-offset: 3px;
+  }
+}
+
+/* Mobile: Studio leads on the stack so the recommended path is the first
+   card a thumb-scrolling visitor reaches. Switch the grid to a flex column
+   so CSS `order` works without fighting auto-fit grid placement. */
+@media (max-width: 720px) {
+  .pricing-grid {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  .pricing-card-studio    { order: -1; }
+  .pricing-card-creator   { order:  0; }
+  .pricing-card-enterprise { order: 1; }
+  /* Drop the desktop translate-y on Studio at mobile sizes — no need for
+     vertical emphasis when it's already the top card. */
+  .pricing-card[data-highlight="true"] { transform: none; }
+  .pricing-card[data-highlight="true"]:hover { transform: translateY(-2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pricing-card,
+  .btn-pricing-dark,
+  .btn-pricing-light {
+    transition: none;
+  }
+  .pricing-card[data-highlight="true"] { transform: none; }
+  .pricing-card:hover { transform: none; box-shadow: inherit; }
+  .btn-pricing-dark:active,
+  .btn-pricing-light:active { transform: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .btn-hero-primary,
   .btn-hero-secondary,
