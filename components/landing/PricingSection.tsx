@@ -277,6 +277,13 @@ export default function PricingSection() {
         >
           {PLANS.map((plan, i) => {
             const price = period === "annual" ? plan.annual : plan.monthly
+            // Append the live billing-period selection to the CTA URL so the
+            // composer's /api/checkout route picks the matching Stripe price
+            // ID. plan.href already carries ?plan=...; add &period=... for
+            // trial CTAs only (mailto links stay untouched).
+            const ctaHref = plan.isContact
+              ? plan.href
+              : `${plan.href}${plan.href.includes("?") ? "&" : "?"}period=${period}`
             return (
               <ScrollReveal key={plan.id} delay={280 + i * 120}>
                 <article
@@ -391,9 +398,7 @@ export default function PricingSection() {
                   </p>
 
                   <a
-                    href={plan.href}
-                    target={plan.isContact ? undefined : undefined}
-                    rel={plan.isContact ? undefined : undefined}
+                    href={ctaHref}
                     onClick={() => onCtaClick(plan)}
                     aria-label={
                       plan.isContact
