@@ -268,28 +268,25 @@ html {
   50%      { opacity: 1; }
 }
 
-/* Hero scroll cue — a thin line drips downward with a subtle fade-in /
-   fade-out, then loops. The text stays static; only the line animates so
-   the motion stays implicit. Wrapped in @layer components for the same
-   reason the hero CTA hover states are: Tailwind 4 strips bare class
-   selectors that don't match a known utility. */
-@keyframes hero-scroll-drip {
-  0%   { transform: translateY(-8px); opacity: 0; }
-  30%  { opacity: 0.7; }
+/* Hero scroll cue — the inner dot of the mouse outline ticks downward
+   then fades, simulating the scroll-wheel gesture. Outline stays static,
+   text stays static; only the dot animates. Wrapped in @layer components
+   so Tailwind 4 keeps the class selector. */
+@keyframes hero-scroll-mouse {
+  0%   { transform: translateY(0);    opacity: 0; }
+  25%  { opacity: 1; }
+  60%  { transform: translateY(10px); opacity: 1; }
   100% { transform: translateY(12px); opacity: 0; }
 }
 @layer components {
-  .hero-scroll-cue-line {
-    display: block;
-    width: 1px;
-    height: 18px;
-    background: rgba(245, 243, 239, 0.6);
-    animation: hero-scroll-drip 1.8s ease-in-out infinite;
-    transform-origin: top center;
+  .hero-scroll-cue-dot {
+    animation: hero-scroll-mouse 1.8s ease-in-out infinite;
+    transform-box: fill-box;
+    transform-origin: center;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hero-scroll-cue-line { animation: none; opacity: 0.5; }
+  .hero-scroll-cue-dot { animation: none; opacity: 0.7; }
 }
 
 /* Reduced-motion: disable the breathe entirely. Played/unplayed split still

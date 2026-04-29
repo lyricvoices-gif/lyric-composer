@@ -275,9 +275,11 @@ export default function Hero() {
         </div>
       </div>
 
-      {/* Subtle scroll cue — text + a thin line that drips downward to imply
-          motion. Animation is opacity + transform only (compositor-friendly)
-          and respects prefers-reduced-motion via globals.css. */}
+      {/* Subtle scroll cue — mouse outline with an inner dot that ticks
+          downward, fades, and loops. Implies the scroll-wheel gesture
+          without leaning on a brand-foreign chevron. Compositor-only
+          animation (opacity + transform); respects prefers-reduced-motion
+          via globals.css. */}
       <div
         aria-hidden="true"
         className="hero-scroll-cue"
@@ -286,7 +288,7 @@ export default function Hero() {
           left: "50%",
           bottom: "24px",
           transform: "translateX(-50%)",
-          color: "rgba(245,243,239,0.45)",
+          color: "rgba(245,243,239,0.55)",
           fontSize: "10px",
           letterSpacing: "0.2em",
           textTransform: "uppercase",
@@ -294,11 +296,28 @@ export default function Hero() {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          gap: "10px",
+          gap: "12px",
         }}
       >
+        <svg
+          width="22"
+          height="36"
+          viewBox="0 0 22 36"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <rect
+            x="1"
+            y="1"
+            width="20"
+            height="34"
+            rx="10"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          />
+          <circle className="hero-scroll-cue-dot" cx="11" cy="9" r="1.75" fill="currentColor" />
+        </svg>
         <span>Scroll</span>
-        <span className="hero-scroll-cue-line" />
       </div>
     </section>
   )

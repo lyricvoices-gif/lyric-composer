@@ -160,7 +160,10 @@ export default function ComposerDemo() {
               color: TEXT2,
               lineHeight: 1.6,
               maxWidth: "560px",
-              margin: "0 auto 64px",
+              // Bottom margin matches the section's outer top padding so the
+              // header content block has equal breathing room above the
+              // eyebrow and below the subhead.
+              margin: "0 auto clamp(72px, 10vh, 112px)",
               textAlign: "center",
             }}
           >
