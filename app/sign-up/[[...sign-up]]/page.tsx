@@ -1,9 +1,19 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import Wordmark from "@/components/Wordmark"
+
+// Pricing CTAs hand off ?plan=studio&period=annual via the URL. Capture
+// those once on mount and stash them so the rest of the auth → onboarding
+// → upgrade chain (which doesn't carry query strings through OAuth round-
+// trips) can pick the matching Stripe price ID at checkout. The TTL on
+// this stash is enforced in /upgrade so a long-abandoned tab can't fire
+// the wrong checkout the next time the user signs up.
+const SIGNUP_INTENT_KEY = "lyric_signup_intent"
+const VALID_PLANS = new Set(["creator", "studio"])
+const VALID_PERIODS = new Set(["monthly", "annual"])
 
 // ── Design tokens ────────────────────────────────────────────────────────────
 const DARK = "#2b2a25"
@@ -24,6 +34,26 @@ export default function SignUpPage() {
 
   // OTP state
   const [otp, setOtp] = useState("")
+
+  // Capture plan + period intent from the URL once on mount. We do this
+  // before any auth interaction so the OAuth/OTP redirect can't strip the
+  // query string — sessionStorage survives same-origin redirects.
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    const plan = params.get("plan")
+    const period = params.get("period") ?? "monthly"
+    if (plan && VALID_PLANS.has(plan) && VALID_PERIODS.has(period)) {
+      try {
+        sessionStorage.setItem(
+          SIGNUP_INTENT_KEY,
+          JSON.stringify({ plan, period, at: Date.now() })
+        )
+      } catch {
+        /* sessionStorage disabled — fall back to default flow */
+      }
+    }
+  }, [])
 
   function resetState() {
     setStep("input")

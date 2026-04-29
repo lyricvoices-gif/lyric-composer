@@ -26,6 +26,43 @@ const TOAST_MESSAGES: Record<string, string> = {
   expired: "Your trial or subscription has ended. Choose a plan to continue using the composer.",
 }
 
+// Matches the stash key + TTL set by the sign-up page when a visitor
+// arrives from a pricing CTA carrying ?plan=&period=.
+const SIGNUP_INTENT_KEY = "lyric_signup_intent"
+const SIGNUP_INTENT_TTL_MS = 60 * 60 * 1000
+
+interface SignupIntent {
+  plan: "creator" | "studio"
+  period: "monthly" | "annual"
+  at: number
+}
+
+function readSignupIntent(): SignupIntent | null {
+  if (typeof window === "undefined") return null
+  try {
+    const raw = sessionStorage.getItem(SIGNUP_INTENT_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<SignupIntent>
+    if (!parsed.plan || !parsed.period || !parsed.at) return null
+    if (Date.now() - parsed.at > SIGNUP_INTENT_TTL_MS) {
+      sessionStorage.removeItem(SIGNUP_INTENT_KEY)
+      return null
+    }
+    return parsed as SignupIntent
+  } catch {
+    return null
+  }
+}
+
+function clearSignupIntent() {
+  if (typeof window === "undefined") return
+  try {
+    sessionStorage.removeItem(SIGNUP_INTENT_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
 export default function UpgradePage() {
   return (
     <Suspense fallback={
@@ -42,10 +79,18 @@ function UpgradeContent() {
   const [showPlans, setShowPlans] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [toastVisible, setToastVisible] = useState(false)
+  // True while we're auto-firing checkout based on the intent stashed by
+  // the sign-up page. We render a minimal "Redirecting…" shell during
+  // this window instead of flashing the upgrade UI.
+  const [autoCheckout, setAutoCheckout] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  // Check auth state — if user already has an active plan, redirect to composer
+  // Check auth state — if user already has an active plan, redirect to
+  // composer. Otherwise check for a sign-up intent stashed from a pricing
+  // CTA and, if present, auto-fire checkout with the matching plan +
+  // period. This is what keeps "Try Studio free / Annual" from collapsing
+  // back to the default Creator monthly trial.
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -61,9 +106,45 @@ function UpgradeContent() {
       if (hasPlan || hasTrial) {
         const dest = meta.onboarding_complete ? "/" : "/onboarding"
         router.replace(dest)
+        return
       }
+
+      // No active plan — see if the sign-up page stashed a CTA intent.
+      // Skip the auto-fire if the user came here from an "expired" toast,
+      // because we want them to actively confirm a plan, not get bounced
+      // into Stripe based on a long-stored stash.
+      const reason = searchParams.get("reason")
+      if (reason) return
+      const intent = readSignupIntent()
+      if (!intent) return
+
+      setAutoCheckout(true)
+      clearSignupIntent()
+      ;(async () => {
+        try {
+          const res = await fetch("/api/checkout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              planId: intent.plan,
+              period: intent.period,
+              trial: true,
+            }),
+          })
+          const data = await res.json()
+          if (data.url) {
+            window.location.href = data.url
+          } else {
+            console.error("[upgrade] auto-checkout missing URL:", data)
+            setAutoCheckout(false)
+          }
+        } catch (err) {
+          console.error("[upgrade] auto-checkout error:", err)
+          setAutoCheckout(false)
+        }
+      })()
     })
-  }, [router])
+  }, [router, searchParams])
 
   // Show toast if reason param is present
   useEffect(() => {
@@ -87,7 +168,7 @@ function UpgradeContent() {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId: "creator", trial: true }),
+        body: JSON.stringify({ planId: "creator", trial: true, period: "monthly" }),
       })
       const data = await res.json()
       if (data.url) {
@@ -108,7 +189,7 @@ function UpgradeContent() {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId }),
+        body: JSON.stringify({ planId, period: "monthly" }),
       })
       const data = await res.json()
       if (data.url) {
@@ -124,6 +205,30 @@ function UpgradeContent() {
   }
 
   if (!hasAccount) return null
+
+  if (autoCheckout) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: DARK,
+          color: LIGHT,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "16px",
+          padding: "24px",
+          textAlign: "center",
+        }}
+      >
+        <Wordmark height={32} color={LIGHT} />
+        <p style={{ fontSize: "14px", color: MUTED, margin: 0, lineHeight: 1.5 }}>
+          Redirecting to checkout&hellip;
+        </p>
+      </div>
+    )
+  }
 
   return (
     <>
