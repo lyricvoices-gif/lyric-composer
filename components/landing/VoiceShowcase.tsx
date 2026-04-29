@@ -424,7 +424,9 @@ export default function VoiceShowcase() {
               margin: "0 0 56px",
             }}
           >
-            Five real voice artists, each performing the work they were built for. Press play on any voice.
+            Five real voice artists, each performing the work they were built for.
+            <br />
+            Press play on any voice.
           </p>
         </ScrollReveal>
 
@@ -661,7 +663,9 @@ export default function VoiceShowcase() {
               margin: "64px 0 0",
             }}
           >
-            Each voice was performed by a real artist and built for specific work. Broadcast narration. Brand films. Product walkthroughs. Creator content. Documentary storytelling.
+            Each voice was performed by a real artist and built for specific work. Broadcast narration.
+            <br />
+            Brand films. Product walkthroughs. Creator content. Documentary storytelling.
           </p>
         </ScrollReveal>
       </div>

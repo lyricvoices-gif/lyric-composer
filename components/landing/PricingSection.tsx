@@ -478,7 +478,9 @@ export default function PricingSection() {
               marginRight: "auto",
             }}
           >
-            Credit card required to start the trial. Cancel anytime before day 7 and you won&apos;t be charged.
+            Credit card required to start the trial.
+            <br />
+            Cancel anytime before day 7 and you won&apos;t be charged.
           </p>
         </ScrollReveal>
       </div>

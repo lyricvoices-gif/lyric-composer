@@ -131,7 +131,7 @@ export default function ComposerDemo() {
     >
       <div style={{ maxWidth: "1120px", margin: "0 auto" }}>
         <ScrollReveal>
-          <p style={{ ...label, marginBottom: "20px" }}>What you&apos;ll make</p>
+          <p style={{ ...label, marginBottom: "20px", textAlign: "center" }}>What you&apos;ll make</p>
         </ScrollReveal>
 
         <ScrollReveal delay={60}>
@@ -142,9 +142,10 @@ export default function ComposerDemo() {
               fontWeight: 500,
               letterSpacing: "-0.02em",
               color: TEXT1,
-              margin: "0 0 20px",
+              margin: "0 auto 20px",
               lineHeight: 1.0,
               maxWidth: "18ch",
+              textAlign: "center",
             }}
           >
             Direction is part of the format.{" "}
@@ -159,7 +160,8 @@ export default function ComposerDemo() {
               color: TEXT2,
               lineHeight: 1.6,
               maxWidth: "560px",
-              margin: "0 0 64px",
+              margin: "0 auto 64px",
+              textAlign: "center",
             }}
           >
             Most AI voice tools give you a slider. Lyric gives you a script you can direct, sentence by sentence. Watch what that looks like.

@@ -253,7 +253,9 @@ export default function EthicsSection() {
                 lineHeight: 1.5,
               }}
             >
-              7-day free trial. Credit card required. Cancel anytime. Full commercial rights on Creator and Studio plans.
+              7-day free trial. Credit card required. Cancel anytime.
+              <br />
+              Full commercial rights on Creator and Studio plans.
             </p>
           </div>
         </ScrollReveal>

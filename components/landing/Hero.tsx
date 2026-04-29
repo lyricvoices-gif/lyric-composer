@@ -168,7 +168,7 @@ export default function Hero() {
                 maxWidth: "1100px",
               }}
             >
-              Studio-quality voiceover in 30 seconds.
+              Studio-quality voiceover in seconds.
               <br />
               <span style={{ ...italic, color: GOLD, fontWeight: 400 }}>Composed, not cloned.</span>
             </h1>
@@ -184,7 +184,7 @@ export default function Hero() {
                 margin: 0,
               }}
             >
-              For brands, agencies, and creators who need broadcast-ready audio without the booking, the budget, or the ethical baggage of voice cloning. Direct five real voice artists with intent, emotion, and pacing.
+              For brands, agencies, and creators who need broadcast-ready audio without the booking, the budget, or the ethical baggage of voice cloning. Direct real voice artists with intent, emotion, and pacing.
             </p>
           </ScrollReveal>
 
@@ -267,28 +267,38 @@ export default function Hero() {
                 maxWidth: "520px",
               }}
             >
-              7-day free trial. Credit card required. Cancel anytime. Full commercial rights on Creator and Studio plans.
+              7-day free trial. Credit card required. Cancel anytime.
+              <br />
+              Full commercial rights on Creator and Studio plans.
             </p>
           </ScrollReveal>
         </div>
       </div>
 
-      {/* Subtle scroll cue */}
+      {/* Subtle scroll cue — text + a thin line that drips downward to imply
+          motion. Animation is opacity + transform only (compositor-friendly)
+          and respects prefers-reduced-motion via globals.css. */}
       <div
         aria-hidden="true"
+        className="hero-scroll-cue"
         style={{
           position: "absolute",
           left: "50%",
           bottom: "24px",
           transform: "translateX(-50%)",
-          color: "rgba(245,243,239,0.4)",
+          color: "rgba(245,243,239,0.45)",
           fontSize: "10px",
           letterSpacing: "0.2em",
           textTransform: "uppercase",
           zIndex: 2,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "10px",
         }}
       >
-        Scroll
+        <span>Scroll</span>
+        <span className="hero-scroll-cue-line" />
       </div>
     </section>
   )

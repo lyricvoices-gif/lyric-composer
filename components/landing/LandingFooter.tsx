@@ -8,7 +8,7 @@ const SOCIAL_LINKS = [
   { name: "Instagram", href: "https://instagram.com/lyricvoices" },
   { name: "X", href: "https://x.com/lyricvoices" },
   { name: "Threads", href: "https://threads.net/@lyricvoices" },
-  { name: "Spotify", href: "https://open.spotify.com" },
+  { name: "Spotify", href: "https://open.spotify.com/show/6iu0viCB2eTtNiE0SM1Pl6" },
   { name: "YouTube", href: "https://youtube.com/@lyricvoices" },
 ]
 
