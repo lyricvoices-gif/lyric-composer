@@ -341,6 +341,35 @@ body {
   .built-with-link:active { transform: none; }
 }
 
+/* Footer — social icons brighten on hover, legal links underline. */
+@layer components {
+  .footer-social-icon {
+    color: rgba(245, 243, 239, 0.4);
+    display: flex;
+    align-items: center;
+    transition: color 0.2s ease;
+  }
+  .footer-social-icon:hover,
+  .footer-social-icon:focus-visible {
+    color: rgba(245, 243, 239, 0.9);
+  }
+  .footer-legal-link {
+    transition: color 0.2s ease;
+  }
+  .footer-legal-link:hover,
+  .footer-legal-link:focus-visible {
+    color: rgba(245, 243, 239, 0.7) !important;
+    text-decoration: underline;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .footer-social-icon,
+  .footer-legal-link {
+    transition: none;
+  }
+}
+
 /* Reduced-motion: disable the breathe entirely. Played/unplayed split still
    updates as audio plays — only the per-bar shimmer is gone. */
 @media (prefers-reduced-motion: reduce) {

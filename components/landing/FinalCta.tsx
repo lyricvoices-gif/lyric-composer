@@ -39,7 +39,8 @@ export default function FinalCta() {
               letterSpacing: "-0.02em",
             }}
           >
-            Ready to direct{" "}
+            Ready to direct
+            <br />
             <span style={{ ...italic, color: GOLD, fontWeight: 400 }}>your first take?</span>
           </h2>
         </ScrollReveal>
@@ -54,7 +55,7 @@ export default function FinalCta() {
               margin: "0 auto 40px",
             }}
           >
-            Seven days free. All five voices. Full direction. No pressure to keep going.
+            Seven days free. Full access. No pressure to keep going.
           </p>
         </ScrollReveal>
 
