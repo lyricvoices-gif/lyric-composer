@@ -1,38 +1,45 @@
 "use client"
 
-import Image from "next/image"
+import { useEffect, useRef } from "react"
 import ScrollReveal from "./ScrollReveal"
-import { CREAM, TEXT1, TEXT2, TEXT3, GOLD, display, italic, label } from "./tokens"
+import { CREAM, TEXT1, GOLD, display, italic, label } from "./tokens"
+import { track } from "./track"
 
-const founders = [
-  { src: "/landing/images/founder-1.webp", alt: "Founder portrait" },
-  { src: "/landing/images/founder-2.webp", alt: "Founder portrait" },
-  { src: "/landing/images/founder-3.webp", alt: "Founder portrait" },
-  { src: "/landing/images/founder-4.webp", alt: "Founder portrait" },
-]
-
-const quotes = [
-  {
-    body: "Direction inside the script is the missing piece in every other AI voice tool. Lyric is the first one that feels like a creative partner rather than a button.",
-    name: "Early Studio user",
-    role: "Brand director",
-  },
-  {
-    body: "I gave it a thirty-second spot script with three emotion tags and got back a take I would have paid a session voice for. Then I tried two more variants in a minute.",
-    name: "Early Creator user",
-    role: "Independent producer",
-  },
-]
+const LINKEDIN_HREF = "https://www.linkedin.com/in/mikeybucks"
 
 export default function SocialProof() {
+  const sectionRef = useRef<HTMLDivElement>(null)
+  const viewedRef = useRef(false)
+
+  useEffect(() => {
+    const el = sectionRef.current
+    if (!el || viewedRef.current) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !viewedRef.current) {
+          viewedRef.current = true
+          track("built_with_section_viewed")
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.25 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  function onLinkedInClick() {
+    track("linkedin_clicked")
+  }
+
   return (
-    <div style={{ background: CREAM, padding: "clamp(72px, 10vh, 112px) 24px" }}>
+    <div ref={sectionRef} style={{ background: CREAM, padding: "120px 24px" }}>
       <div style={{ maxWidth: "1120px", margin: "0 auto" }}>
         <ScrollReveal>
           <p style={{ ...label, marginBottom: "20px" }}>Built with</p>
         </ScrollReveal>
 
-        <ScrollReveal delay={60}>
+        <ScrollReveal delay={80}>
           <h2
             style={{
               ...display,
@@ -40,123 +47,70 @@ export default function SocialProof() {
               fontWeight: 500,
               letterSpacing: "-0.02em",
               color: TEXT1,
-              margin: "0 0 56px",
+              margin: "0 0 32px",
               lineHeight: 1.05,
               maxWidth: "22ch",
             }}
           >
-            Made by people who&apos;ve shipped AI products at the brands you&apos;ve heard of.{" "}
-            <span style={{ ...italic, color: GOLD, fontWeight: 400 }}>Voices by people you&apos;ve heard.</span>
+            Created by founders who&apos;ve built AI products for the world&apos;s top brands.{" "}
+            <span style={{ ...italic, color: GOLD, fontWeight: 400 }}>
+              Powered by professional voice artists.
+            </span>
           </h2>
         </ScrollReveal>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: "32px",
-            alignItems: "start",
-          }}
-        >
-          <ScrollReveal delay={120}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "14px",
-                padding: "20px 24px",
-                background: "#ffffff",
-                borderRadius: "100px",
-                border: "1px solid rgba(28,25,23,0.06)",
-                width: "fit-content",
-              }}
-            >
-              <div style={{ display: "flex" }}>
-                {founders.map((f, i) => (
-                  <div
-                    key={f.src}
-                    style={{
-                      width: "36px",
-                      height: "36px",
-                      borderRadius: "50%",
-                      overflow: "hidden",
-                      border: "2px solid #ffffff",
-                      marginLeft: i === 0 ? 0 : "-10px",
-                      background: "#d4c9bc",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Image
-                      src={f.src}
-                      alt={f.alt}
-                      width={36}
-                      height={36}
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                    />
-                  </div>
-                ))}
-              </div>
-              <p style={{ fontSize: "13px", color: TEXT2, margin: 0, letterSpacing: "0.01em" }}>
-                Shaped by designers behind AI products at top brands.
-              </p>
-            </div>
-          </ScrollReveal>
-        </div>
+        <ScrollReveal delay={160}>
+          <p
+            style={{
+              fontSize: "18px",
+              color: "rgba(43,42,37,0.8)",
+              lineHeight: 1.6,
+              maxWidth: "65ch",
+              margin: 0,
+            }}
+          >
+            Lyric was founded by Michael Lang, an AI leader at Amazon. Edition 01 was created with top voice artists from broadcast, audiobook, and brand work. With deep experience building leading AI tools, we launched Lyric to set a new standard for ethical voice technology.
+          </p>
+        </ScrollReveal>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-            gap: "24px",
-            marginTop: "56px",
-          }}
-        >
-          {quotes.map((q, i) => (
-            <ScrollReveal key={q.body} delay={180 + i * 80}>
-              <figure
-                style={{
-                  margin: 0,
-                  padding: "32px",
-                  background: "#ffffff",
-                  border: "1px solid rgba(28,25,23,0.06)",
-                  borderRadius: "20px",
-                  height: "100%",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "20px",
-                }}
-              >
-                <span
-                  style={{
-                    ...display,
-                    fontStyle: "italic",
-                    fontSize: "44px",
-                    color: GOLD,
-                    lineHeight: 0.5,
-                    height: "20px",
-                  }}
-                  aria-hidden="true"
-                >
-                  &ldquo;
-                </span>
-                <blockquote
-                  style={{
-                    margin: 0,
-                    fontSize: "16px",
-                    color: TEXT1,
-                    lineHeight: 1.55,
-                    letterSpacing: "-0.005em",
-                  }}
-                >
-                  {q.body}
-                </blockquote>
-                <figcaption style={{ fontSize: "12px", color: TEXT3, letterSpacing: "0.01em" }}>
-                  <strong style={{ color: TEXT2, fontWeight: 600 }}>{q.name}</strong> · {q.role}
-                </figcaption>
-              </figure>
-            </ScrollReveal>
-          ))}
-        </div>
+        <ScrollReveal delay={310}>
+          <a
+            href={LINKEDIN_HREF}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={onLinkedInClick}
+            aria-label="Meet the founders on LinkedIn"
+            className="built-with-link"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              marginTop: "24px",
+              ...display,
+              fontStyle: "italic",
+              fontSize: "16px",
+              color: TEXT1,
+              textDecoration: "none",
+              letterSpacing: "0.005em",
+              position: "relative",
+            }}
+          >
+            <svg
+              aria-hidden="true"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              style={{ flexShrink: 0 }}
+            >
+              <path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 2.95v5.66H9.36V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z" />
+            </svg>
+            <span className="built-with-link-text">Meet the founders</span>
+            <span aria-hidden="true" style={{ color: GOLD, marginLeft: "2px" }}>
+              →
+            </span>
+          </a>
+        </ScrollReveal>
       </div>
     </div>
   )

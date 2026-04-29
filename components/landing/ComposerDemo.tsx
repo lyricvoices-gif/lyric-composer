@@ -171,13 +171,15 @@ export default function ComposerDemo() {
           </p>
         </ScrollReveal>
 
-        {/* 2x2 grid. minmax forces 2 columns down to ~840px viewport, then
-            collapses to 1 column on smaller screens. No card chrome — the
-            video carries the moment with a single italic caption beneath. */}
+        {/* 2x2 grid. minmax(min(420px, 100%), 1fr) keeps two columns above
+            ~840px and collapses cleanly to one column below — without the
+            min() guard, narrow viewports get a 420px column that overflows
+            the screen edge instead of shrinking. No card chrome; the video
+            carries the moment with a single italic caption beneath. */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(420px, 100%), 1fr))",
             gap: "clamp(32px, 4vw, 48px)",
             alignItems: "start",
           }}

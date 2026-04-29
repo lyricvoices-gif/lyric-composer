@@ -151,7 +151,7 @@ export default function PricingSection() {
       <div style={{ maxWidth: "1120px", margin: "0 auto" }}>
         {/* Section header --------------------------------------------------- */}
         <ScrollReveal>
-          <p style={{ ...label, marginBottom: "20px" }}>Pricing</p>
+          <p style={{ ...label, marginBottom: "20px", textAlign: "center" }}>Pricing</p>
         </ScrollReveal>
 
         <ScrollReveal delay={80}>
@@ -162,9 +162,10 @@ export default function PricingSection() {
               fontWeight: 500,
               letterSpacing: "-0.02em",
               color: TEXT1,
-              margin: "0 0 20px",
+              margin: "0 auto 20px",
               lineHeight: 1.0,
               maxWidth: "20ch",
+              textAlign: "center",
             }}
           >
             Start composing today.{" "}
@@ -179,7 +180,8 @@ export default function PricingSection() {
               color: TEXT2,
               lineHeight: 1.6,
               maxWidth: "60ch",
-              margin: "0 0 40px",
+              margin: "0 auto 40px",
+              textAlign: "center",
             }}
           >
             Every plan starts with a 7-day free trial. Pick what fits today. Change it later.
@@ -187,7 +189,7 @@ export default function PricingSection() {
         </ScrollReveal>
 
         {/* Billing-period toggle ------------------------------------------- */}
-        <ScrollReveal delay={220}>
+        <ScrollReveal delay={220} style={{ textAlign: "center" }}>
           <div
             role="radiogroup"
             aria-label="Billing period"
@@ -197,7 +199,10 @@ export default function PricingSection() {
               background: "rgba(28,25,23,0.05)",
               border: "1px solid rgba(28,25,23,0.06)",
               borderRadius: "100px",
-              marginBottom: "40px",
+              // Bottom margin matches the section's outer top padding so the
+              // header content block has equal breathing room above the
+              // eyebrow and below the toggle.
+              marginBottom: "clamp(72px, 10vh, 112px)",
               gap: "2px",
             }}
           >

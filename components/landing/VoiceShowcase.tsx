@@ -552,11 +552,19 @@ export default function VoiceShowcase() {
                         display: "inline-flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: "12px",
                         flexShrink: 0,
                       }}
                     >
-                      {expanded && playing ? "❚❚" : "▶"}
+                      {expanded && playing ? (
+                        <svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor" aria-hidden="true">
+                          <rect x="0" y="0" width="3.5" height="14" />
+                          <rect x="8.5" y="0" width="3.5" height="14" />
+                        </svg>
+                      ) : (
+                        <svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor" aria-hidden="true">
+                          <path d="M1 0.5v13l10-6.5z" />
+                        </svg>
+                      )}
                     </span>
                   </button>
 

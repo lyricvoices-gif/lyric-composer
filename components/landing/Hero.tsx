@@ -120,9 +120,10 @@ export default function Hero() {
               borderRadius: "100px",
               border: "1px solid rgba(245,243,239,0.14)",
               background: "rgba(245,243,239,0.04)",
+              whiteSpace: "nowrap",
             }}
           >
-            Sign in
+            Sign in / Sign up
           </a>
         </header>
 
@@ -244,11 +245,19 @@ export default function Hero() {
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "9px",
                   flexShrink: 0,
                 }}
               >
-                {playing ? "❚❚" : "▶"}
+                {playing ? (
+                  <svg width="8" height="9" viewBox="0 0 8 9" fill="currentColor" aria-hidden="true">
+                    <rect x="0" y="0" width="2.5" height="9" />
+                    <rect x="5.5" y="0" width="2.5" height="9" />
+                  </svg>
+                ) : (
+                  <svg width="8" height="9" viewBox="0 0 8 9" fill="currentColor" aria-hidden="true">
+                    <path d="M0.5 0.4v8.2l7-4.1z" />
+                  </svg>
+                )}
               </span>
               {playing ? "Pause sample" : "Play a sample"}
             </button>

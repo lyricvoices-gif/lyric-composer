@@ -38,6 +38,8 @@ export type UserEventType =
   | "pricing_cta_clicked"
   | "annual_toggled"
   | "pricing_link_clicked"
+  | "built_with_section_viewed"
+  | "linkedin_clicked"
 
 export interface UserEventInput {
   userId: string | null

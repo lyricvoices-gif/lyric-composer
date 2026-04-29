@@ -33,6 +33,8 @@ const ALLOWED_EVENTS: UserEventType[] = [
   "pricing_cta_clicked",
   "annual_toggled",
   "pricing_link_clicked",
+  "built_with_section_viewed",
+  "linkedin_clicked",
 ]
 
 export async function POST(req: NextRequest) {
