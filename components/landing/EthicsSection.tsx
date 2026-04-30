@@ -13,9 +13,9 @@ const PILLARS = [
   {
     n: "01",
     eyebrow: "Real artists, real contracts",
-    title: "Voices built with the people who own them.",
+    title: "Built with working artists, not scraped from the internet.",
     body:
-      "Every voice in Edition 01 was performed by a working voice artist who signed, recorded, and trained the model with us. They are credited, paid up front, and earn ongoing revenue every time their voice is used. No scraping. No surprises. No legal exposure.",
+      "Every voice in Edition 01 comes from a professional artist who partnered with us to sign, record, and train the model. Artists are credited, paid upfront, and receive ongoing revenue whenever their voice is used. No scraping. No surprises. No legal risks.",
   },
   {
     n: "02",
