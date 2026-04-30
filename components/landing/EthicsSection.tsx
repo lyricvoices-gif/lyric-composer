@@ -121,7 +121,7 @@ export default function EthicsSection() {
               margin: 0,
             }}
           >
-            Every voice on Lyric was built with a real artist, in a real studio, under a real contract. They get paid every time you use them. That&apos;s why your work clears legal, your clients say yes, and your audience never feels the uncanny valley.
+            Your work clears legal. Your clients say yes. Your audience never feels the uncanny valley.
           </p>
         </ScrollReveal>
 
