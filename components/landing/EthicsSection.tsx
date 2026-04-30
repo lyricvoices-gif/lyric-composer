@@ -13,7 +13,7 @@ const PILLARS = [
   {
     n: "01",
     eyebrow: "Real artists, real contracts",
-    title: "Built with working artists, not scraped from the internet.",
+    title: "Built with working artists.",
     body:
       "Every Edition 01 voice is fully licensed from real artists. They’re credited, paid, and share in ongoing revenue. No scraping. No surprises. No legal issues.",
   },
