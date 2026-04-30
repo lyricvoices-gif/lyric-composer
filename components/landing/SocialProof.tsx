@@ -70,9 +70,9 @@ export default function SocialProof() {
               margin: 0,
             }}
           >
-            Lyric was founded by Michael Lang, an AI leader at Amazon. Edition 01 was created with top voice artists from broadcast, audiobook, and brand work.
+            Lyric was founded by Michael Lang, an AI leader at Amazon, and co-founders with backgrounds in leading AI, tech, and creative industries.
             <br />
-            With deep experience building leading AI tools, we launched Lyric to set a new standard for ethical voice technology.
+            We launched Lyric to set a new standard for ethical voice technology.
           </p>
         </ScrollReveal>
 
