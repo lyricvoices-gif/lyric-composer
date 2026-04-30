@@ -111,40 +111,13 @@ export default function EthicsSection() {
           </h2>
         </ScrollReveal>
 
-        <ScrollReveal delay={160}>
-          <p
-            style={{
-              fontSize: "17px",
-              color: "rgba(245,243,239,0.8)",
-              lineHeight: 1.6,
-              maxWidth: "60ch",
-              margin: 0,
-            }}
-          >
-            Your work clears legal. Your clients say yes. Your audience never feels the uncanny valley.
-          </p>
-        </ScrollReveal>
-
-        {/* ── Thin gold rule between top zone and columns ───────────────── */}
-        <ScrollReveal delay={240}>
-          <hr
-            aria-hidden="true"
-            style={{
-              border: "none",
-              borderTop: `1px solid ${GOLD}`,
-              opacity: 0.4,
-              margin: "80px 0 0",
-            }}
-          />
-        </ScrollReveal>
-
         {/* ── Middle zone: three pillars ────────────────────────────────── */}
         <div
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
             gap: "clamp(48px, 5vw, 64px)",
-            marginTop: "64px",
+            marginTop: "clamp(64px, 8vh, 96px)",
           }}
         >
           {PILLARS.map((p, i) => (
