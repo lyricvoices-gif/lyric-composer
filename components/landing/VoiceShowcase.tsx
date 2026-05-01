@@ -671,9 +671,9 @@ export default function VoiceShowcase() {
               margin: "64px 0 0",
             }}
           >
-            Each voice was performed by a real artist and built for specific work. Broadcast narration.
+            Edition 01 voices are purpose-built for broadcast, film, audiobooks, product walkthroughs, content, and storytelling.
             <br />
-            Brand films. Product walkthroughs. Creator content. Documentary storytelling.
+            Edition 02 is in development, using the same approach.
           </p>
         </ScrollReveal>
       </div>
