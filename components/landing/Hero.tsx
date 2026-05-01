@@ -185,7 +185,7 @@ export default function Hero() {
                 margin: 0,
               }}
             >
-              For brands, agencies, and creators who need broadcast-ready audio without the booking, the budget, or the ethical baggage of voice cloning. Direct real voice artists with intent, emotion, and pacing.
+              Broadcast-ready audio minus the booking, the cost, and the ethical mess of cloning. Direct real voice artists with authentic emotion and pacing.
             </p>
           </ScrollReveal>
 
