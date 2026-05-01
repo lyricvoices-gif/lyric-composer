@@ -55,7 +55,7 @@ export default function FinalCta() {
               margin: "0 auto 40px",
             }}
           >
-            Seven days free. Full access. No pressure to keep going.
+            Seven days free. Full access.
           </p>
         </ScrollReveal>
 

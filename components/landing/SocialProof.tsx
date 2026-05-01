@@ -33,7 +33,14 @@ export default function SocialProof() {
   }
 
   return (
-    <div ref={sectionRef} style={{ background: CREAM, padding: "120px 24px" }}>
+    <div
+      ref={sectionRef}
+      // clamp() keeps desktop at the original 120px top/bottom while letting
+      // mobile collapse to ~64px — the section's content (headline, single
+      // paragraph, one link) doesn't carry enough weight to earn 120px of
+      // breathing room on a phone.
+      style={{ background: CREAM, padding: "clamp(64px, 10vw, 120px) 24px" }}
+    >
       <div style={{ maxWidth: "1120px", margin: "0 auto" }}>
         <ScrollReveal>
           <p style={{ ...label, marginBottom: "20px" }}>Built with</p>
